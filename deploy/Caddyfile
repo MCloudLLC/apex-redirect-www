@@ -1,0 +1,23 @@
+{
+	email ops@example.com
+
+	on_demand_tls {
+		ask http://127.0.0.1:8081/ask
+	}
+
+	storage file_system /var/lib/caddy
+
+	# Development only: use the ACME staging CA (certificates are not trusted).
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+:80 {
+	reverse_proxy 127.0.0.1:8080
+}
+
+:443 {
+	tls {
+		on_demand
+	}
+	reverse_proxy 127.0.0.1:8080
+}

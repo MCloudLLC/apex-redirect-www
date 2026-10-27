@@ -1,0 +1,10 @@
+# Go build and test artifacts
+/main
+/mc-apex-redirect
+/apex-redirect
+*.test
+/coverage.out
+/coverage.html
+
+# macOS
+.DS_Store

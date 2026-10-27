@@ -1,0 +1,19 @@
+[Unit]
+Description=Apex-to-www redirect service
+After=network.target
+
+[Service]
+Type=simple
+User=apex-redirect
+Group=apex-redirect
+EnvironmentFile=/etc/default/apex-redirect
+ExecStart=/usr/local/bin/apex-redirect
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

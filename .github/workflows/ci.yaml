@@ -25,7 +25,9 @@ jobs:
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
-      - name: Build source image
-        run: docker build -t apex-redirect:ci .
-      - name: Scan application image
-        run: bash scripts/scan-images.sh apex-redirect:ci
+      - name: Build release images
+        run: |
+          docker build -t apex-redirect:ci .
+          docker build -f deploy/Caddy.source.Dockerfile -t apex-caddy:ci .
+      - name: Scan release images
+        run: bash scripts/scan-images.sh apex-redirect:ci apex-caddy:ci

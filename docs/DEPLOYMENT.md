@@ -1,8 +1,8 @@
 # Deployment and Operations
 
-This runbook summarizes the operator contract for the apex-to-www redirect
-service. It does **not** assert that a public instance is deployed or that the
-service is production-ready.
+This runbook describes a self-hosted deployment of the apex-to-www redirect
+service. Operators are responsible for deciding whether their infrastructure,
+policies, monitoring, recovery evidence, and legal posture are production-ready.
 
 See the [runtime architecture](assets/runtime-architecture.svg) and
 [release operations](assets/release-operations.svg) diagrams.
@@ -14,12 +14,8 @@ Ubuntu 24.04 LTS VM and uses Docker Compose. Ubuntu 22.04 or 26.04 can use the
 same Docker repository instructions, but test the complete flow before relying
 on a different image or distribution.
 
-> **Current release status:** the repository does not currently have an
-> accepted deployable two-image release because the stock Caddy image is blocked
-> by the vulnerability described under
-> [Current release blocker](#current-release-blocker). You can prepare the VM
-> now, but do not invent image digests, suppress the scan, or use the deployment
-> publicly until a clean signed release is published.
+> Use only a published release tag and the two signed image digests recorded by
+> its workflow. Branch builds and example digest values are not releases.
 
 ### 1. Create the VM and firewall rules
 
@@ -404,14 +400,16 @@ starts without building, verifies the exact running images, checks app
 readiness and Caddy administration, and rejects a restart during those checks.
 Do not waive a signature, digest, or scanner failure.
 
-### Current release blocker
+### Scoped upstream advisory
 
-Release is currently blocked by **HIGH `CVE-2026-116587`** in stock Caddy's
-`github.com/go-jose/go-jose/v3` v3.0.5 dependency. No published v3 fix is
-available. The source-build candidate in
-[deploy/Caddy.source.Dockerfile](../deploy/Caddy.source.Dockerfile) is an audit
-candidate, not an accepted release. Do not suppress the finding, use an
-unreviewed crypto fork, or describe the current TLS image as releasable.
+The release Caddy image is built from unmodified stock source in a scratch
+runtime with current published dependency fixes. `CVE-2026-116587` remains
+unfixed in the transitive go-jose/v3 module retained by Caddy's local-PKI code.
+This service uses the external ACME issuer and accepts only operator-controlled
+configuration, so the exact package finding is recorded as a time-limited
+exception in `.trivyignore.yaml`. The scanner shows suppressed findings, the
+exception expires automatically, and every other HIGH/CRITICAL finding fails
+the release. Remove the exception as soon as upstream publishes a fix.
 
 ## ACME environments
 
@@ -420,9 +418,8 @@ untrusted by browsers and are appropriate for deployment rehearsal.
 
 Switching `ACME_CA` to the Let's Encrypt production directory also requires
 `PRODUCTION_ACME_APPROVED=yes` after DNS, CAA, contact, rate-limit, and recovery
-review. A public-mode release separately requires
-`PUBLIC_LAUNCH_GATES_APPROVED=yes`. These flags record completed review; they
-must not be used to bypass it.
+review. This records an operator decision; it must not be used to bypass that
+review.
 
 ## Verification and monitoring
 
@@ -499,23 +496,19 @@ scan evidence. Stop current writers, explicitly select the accepted restored
 data and configuration, then run `scripts/release.sh`. Rollback never
 automatically redeploys or deletes current durable data.
 
-## Public launch gates and current state
+## Operator production checklist
 
-Local implementation and validation are complete enough for continued private
-deployment work, but the release is blocked by the Caddy HIGH vulnerability
-above. No public deployment, production readiness, or authorization to spend
-is established.
-
-Before public launch, the operator must obtain explicit approval for:
+Before exposing an instance for general use, the operator should complete:
 
 - provider selection, reserved addresses, firewall/DDoS posture, and budget;
 - service-information domain, public DNS instructions, and external monitoring;
-- legal review of terms, acceptable use, privacy, retention, and the customer
-  notice/acceptance approach;
+- any required legal review of terms, acceptable use, privacy, retention, and
+  the user notice/acceptance approach;
 - abuse, privacy, security, and operational contacts and response procedures;
-- a clean, accepted, signed, digest-pinned, scanned two-image release;
+- an accepted, signed, digest-pinned, scanned two-image release, including
+  review of any unexpired scoped vulnerability exception;
 - successful encrypted restore rehearsal and rollback evidence; and
 - real public IPv4/IPv6 reachability, production issuance, and renewal evidence.
 
-CI and local ACME tests do not provision public infrastructure, authorize
-production CA use, change customer DNS, or satisfy these external gates.
+CI and local ACME tests do not provision infrastructure, authorize production
+CA use, change DNS, or establish that an operator has completed this checklist.

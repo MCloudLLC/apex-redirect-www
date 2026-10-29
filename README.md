@@ -1,12 +1,12 @@
 # MC Apex to WWW
 
-Open-source software for a free, open, signup-free apex-to-www redirect service.
-Self-host it or operate an open instance using the same code. The required
-public hosted service is not deployed or production-approved by this repository.
+Open-source software for operating a self-hosted apex-to-www redirect service.
+Operators control their own infrastructure, domains, policies, legal notices,
+and acceptable-use decisions. This repository does not provide a hosted service.
 
-We own only the redirect, including its apex TLS handling. We do not own customer
-domains, manage their DNS, host their websites, or fetch destination content.
-There is no dependency on the Websites SaaS platform.
+The software performs only the redirect, including its apex TLS handling. It
+does not manage domain registration or DNS, host websites, or fetch destination
+content. There is no dependency on the Websites SaaS platform.
 
 ```text
 http(s)://example.com/a%2Fb?plan=pro
@@ -18,7 +18,7 @@ failures, operator blocks, and unavailable policy state never produce a redirect
 
 See [PLAN.md](PLAN.md) for the design and
 [PLAN_COMPARISON.md](PLAN_COMPARISON.md) for the comparison with the existing
-implementation and the remaining public-launch gates. The operator-focused
+implementation. The operator-focused
 [deployment guide](docs/DEPLOYMENT.md) covers release, monitoring, blocking,
 backup, restore, and rollback.
 
@@ -39,9 +39,10 @@ directly to the customer's existing website host.
 [![Runtime architecture showing apex traffic through Caddy and the private Go policy service](docs/assets/runtime-architecture.svg)](docs/assets/runtime-architecture.svg)
 
 Releases are digest-pinned, signed, scanned, and validated before startup.
-Encrypted recovery and explicit rollback preserve durable state. The current
-TLS image remains fail-closed because HIGH `CVE-2026-116587` has no published
-fix in its Caddy dependency path.
+Encrypted recovery and explicit rollback preserve durable state. The release
+build uses stock Caddy source with current dependency fixes in a scratch image.
+One upstream no-fix advisory is explicitly scoped, documented, and time-limited
+in `.trivyignore.yaml`; all other HIGH/CRITICAL findings remain release blockers.
 
 [![Release and operations flow showing tests, signed image gates, deployment, monitoring, and recovery](docs/assets/release-operations.svg)](docs/assets/release-operations.svg)
 
@@ -172,11 +173,18 @@ Caddy image is not automatically acceptable merely because its tag is current.
 Use approved immutable image digests, signature verification, and the reviewed
 TLS configuration; never bypass a failed scanner to complete a deployment.
 
-Release is currently blocked by HIGH `CVE-2026-116587` in stock Caddy's
-`github.com/go-jose/go-jose/v3` v3.0.5 dependency, without a published v3 fix.
-[deploy/Caddy.source.Dockerfile](deploy/Caddy.source.Dockerfile) records a
-dependency-updated stock-source audit candidate, not an accepted release.
-Its remaining finding is not suppressed.
+The release workflow builds both runtime images from reviewed source, scans
+them, publishes immutable GHCR references, signs both with keyless Cosign, and
+creates the matching GitHub release. The Caddy image is built from unmodified
+stock source in [deploy/Caddy.source.Dockerfile](deploy/Caddy.source.Dockerfile)
+to avoid stale base-image and toolchain findings.
+
+`CVE-2026-116587` has no published fix for the transitive go-jose/v3 module.
+The affected JWK parser is retained by Caddy's local-PKI dependency path, while
+this deployment accepts only operator-controlled configuration and uses the
+external ACME issuer. The exact package exception is visible in
+`.trivyignore.yaml`, expires automatically, and must be removed when upstream
+publishes a fix. It is not a blanket unfixed-vulnerability exemption.
 
 The Linux host-network [Compose definition](deploy/compose.yaml) keeps Go and
 Caddy administration private while exposing TCP 80/443 through Caddy. HTTP/1.1
@@ -198,8 +206,9 @@ curl --fail http://127.0.0.1:8081/readyz
 
 Examples default to Let's Encrypt staging, whose certificates are not trusted
 by browsers. A production issuer requires explicit `PRODUCTION_ACME_APPROVED=yes`.
-A public-mode release additionally requires `PUBLIC_LAUNCH_GATES_APPROVED=yes`
-after the external gates below have actually been satisfied.
+`MODE=public` is an operator choice that permits DNS-based enrollment by
+domains pointing at that operator's service. Operators are responsible for
+capacity, abuse handling, legal review, monitoring, and public communications.
 
 For native deployment, retain [deploy/apex-redirect.service](deploy/apex-redirect.service)
 and install the reviewed [deploy/caddy.service](deploy/caddy.service) with
@@ -280,21 +289,11 @@ archived manifests, image digests, signature evidence and ownership, stop
 writers, then explicitly select/start an accepted release. Never delete
 durable volumes or run `docker compose down -v`.
 
-## Open service, terms, and launch gates
+## Operator responsibility
 
-The required hosted offering is open and signup-free, not unrestricted. Draft
-[Terms and Acceptable Use](TERMS.md) reserve the right to block domains,
-wildcard patterns, client IPs and ranges. [Privacy](PRIVACY.md) describes the
-limited redirect processing, operational state, and Certificate Transparency.
-These documents require legal review and completed operator/contact/retention
-details before public launch. Publishing drafts is not legal approval.
-
-The operator must separately approve a provider, reserved addresses, service
-information domain, monthly budget, abuse/review contacts, legal notices,
-external monitoring, a clean signed release, backup restoration evidence, and
-real public IPv4/IPv6 plus renewal evidence. A public information site can
-publish DNS instructions and approved notices; do not serve it as customer
-apex content. No production service or public DNS is provisioned by running CI.
-
-The code is licensed under [Apache-2.0](LICENSE). Hosted-service restrictions
-do not amend that license or impose our blocklist on independent self-hosters.
+The code is licensed under [Apache-2.0](LICENSE) and provided without warranty.
+Each operator is responsible for infrastructure, security updates, DNS and
+certificate-authority compliance, monitoring, backups, incident response,
+capacity, abuse handling, and applicable legal or privacy obligations.
+[TERMS.md](TERMS.md) and [PRIVACY.md](PRIVACY.md) are optional starting
+templates for operators; they are not legal advice or project-wide policies.

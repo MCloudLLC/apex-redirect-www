@@ -1,6 +1,8 @@
-# Hosted Redirect Service Privacy Disclosure
+# Operator Privacy Disclosure Template
 
-Draft for legal and operational review. Not approved for public launch.
+Optional starting template for self-hosted operators. It is not legal advice
+and must be adapted to the actual deployment, providers, retention practices,
+contacts, and applicable law before publication.
 
 The operator must publish its identity, contact channels, applicable rights and
 lawful bases, infrastructure providers and processing locations, and concrete

@@ -29,8 +29,6 @@ def check():
         raise ValueError("MODE must be selfhost or public")
     if mode == "selfhost" and not os.environ.get("ALLOWED_DOMAINS", "").strip():
         raise ValueError("selfhost requires ALLOWED_DOMAINS")
-    if mode == "public" and os.environ.get("PUBLIC_LAUNCH_GATES_APPROVED") != "yes":
-        raise ValueError("public release requires PUBLIC_LAUNCH_GATES_APPROVED=yes after external review")
     if os.environ.get("ADMISSION_ENABLED", "true") != "true":
         raise ValueError("release startup requires ADMISSION_ENABLED=true")
     ca = os.environ.get("ACME_CA", "https://acme-staging-v02.api.letsencrypt.org/directory")

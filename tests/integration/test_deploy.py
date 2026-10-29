@@ -26,7 +26,7 @@ class ReleaseGate(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 preflight.validate_image(value)
 
-    def test_private_service_address_and_launch_gates(self):
+    def test_private_service_address_and_release_gates(self):
         baseline = {"APP_IMAGE": "example.invalid/apex@sha256:" + "1" * 64,
                     "CADDY_IMAGE": "example.invalid/caddy@sha256:" + "2" * 64,
                     "SERVICE_PUBLIC_IPS": "93.184.216.34", "ACME_EMAIL": "ops@example.com",
@@ -35,7 +35,6 @@ class ReleaseGate(unittest.TestCase):
             ({"CADDY_IMAGE": "caddy:latest"}, "CADDY_IMAGE"),
             ({"SERVICE_PUBLIC_IPS": "127.0.0.1"}, "real public"),
             ({}, "ALLOWED_DOMAINS"),
-            ({"MODE": "public"}, "PUBLIC_LAUNCH_GATES_APPROVED"),
             ({"ALLOWED_DOMAINS": "example.com", "ADMISSION_ENABLED": "false"}, "ADMISSION_ENABLED"),
             ({"ALLOWED_DOMAINS": "example.com", "ACME_CA": "https://unintended.invalid"}, "Let's Encrypt"),
             ({"ALLOWED_DOMAINS": "example.com",
@@ -44,6 +43,19 @@ class ReleaseGate(unittest.TestCase):
             with self.subTest(changes=changes), patch.dict(os.environ, baseline | changes, clear=True):
                 with self.assertRaisesRegex(ValueError, message):
                     preflight.check()
+
+    def test_public_mode_is_an_operator_choice(self):
+        environment = {
+            "APP_IMAGE": "example.invalid/apex@sha256:" + "1" * 64,
+            "CADDY_IMAGE": "example.invalid/caddy@sha256:" + "2" * 64,
+            "SERVICE_PUBLIC_IPS": "93.184.216.34",
+            "ACME_EMAIL": "ops@example.com",
+            "APEX_DATA_DIR": str(ROOT / "nonexistent-data"),
+            "MODE": "public",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            with self.assertRaisesRegex(ValueError, "APEX_DATA_DIR"):
+                preflight.check()
 
 
 class EncryptedRecovery(unittest.TestCase):

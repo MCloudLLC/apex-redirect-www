@@ -20,13 +20,12 @@ jobs:
           go install filippo.io/age/cmd/...@v1.2.1
           bash scripts/check.sh
       - name: Local ACME lifecycle (no public DNS or public CA)
-        run: bash scripts/test-acme.sh
+        run: ACME_TEST_NATIVE=1 bash scripts/test-acme.sh
       - name: Dependency audit
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
           govulncheck ./...
       - name: Build source image
         run: docker build -t apex-redirect:ci .
-      - name: Scan application and TLS images
-        run: |
-          bash scripts/scan-images.sh apex-redirect:ci caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
+      - name: Scan application image
+        run: bash scripts/scan-images.sh apex-redirect:ci

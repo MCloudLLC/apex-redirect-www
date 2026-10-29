@@ -1,23 +1,45 @@
 {
-	email ops@example.com
-
+	admin 127.0.0.1:2019
+	persist_config off
+	email {$ACME_EMAIL:ops@example.invalid}
+	http_port {$CADDY_HTTP_PORT:80}
+	https_port {$CADDY_HTTPS_PORT:443}
+	auto_https disable_redirects
+	grace_period 10s
 	on_demand_tls {
-		ask http://127.0.0.1:8081/ask
+		ask http://{$ASK_ADDR:127.0.0.1:8081}/ask
 	}
-
-	storage file_system /var/lib/caddy
-
-	# Development only: use the ACME staging CA (certificates are not trusted).
-	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+	storage file_system {$CADDY_STORAGE:/var/lib/caddy}
+	servers {
+		strict_sni_host on
+		protocols h1 h2
+		timeouts {
+			read_header 10s
+			read_body 10s
+			write 15s
+			idle 60s
+		}
+	}
 }
 
-:80 {
-	reverse_proxy 127.0.0.1:8080
+(redirect_backend) {
+	reverse_proxy {$HTTP_ADDR:127.0.0.1:8080} {
+		header_up X-Apex-Client-IP {http.request.remote.host}
+		header_up -X-Forwarded-Host
+	}
 }
 
-:443 {
+# Caddy's HTTP-01 middleware intercepts active challenges before this catch-all.
+:{$CADDY_HTTP_PORT:80} {
+	import redirect_backend
+}
+
+:{$CADDY_HTTPS_PORT:443} {
 	tls {
 		on_demand
+		issuer acme {
+			dir {$ACME_CA:https://acme-staging-v02.api.letsencrypt.org/directory}
+		}
 	}
-	reverse_proxy 127.0.0.1:8080
+	import redirect_backend
 }

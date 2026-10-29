@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980" role="img" aria-labelledby="release-title release-desc">
+  <title id="release-title">Release and operations lifecycle</title>
+  <desc id="release-desc">A gated release flow from source and continuous integration through tests, local ACME, application and audited stock-source Caddy builds, digest signing and scanning, a fail-closed CVE blocker, Linux Compose and systemd deployment, readiness monitoring, encrypted age backups, new-directory restore, explicit rollback, and external production launch gates.</desc>
+  <defs>
+    <linearGradient id="release-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071426"/>
+      <stop offset="0.58" stop-color="#0b2036"/>
+      <stop offset="1" stop-color="#102b40"/>
+    </linearGradient>
+    <linearGradient id="release-card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#142f48"/>
+      <stop offset="1" stop-color="#0c2035"/>
+    </linearGradient>
+    <linearGradient id="release-cyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#0891b2"/>
+    </linearGradient>
+    <filter id="release-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#020617" flood-opacity="0.42"/>
+    </filter>
+    <marker id="rel-arrow-cyan" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#22d3ee"/>
+    </marker>
+    <marker id="rel-arrow-green" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#4ade80"/>
+    </marker>
+    <marker id="rel-arrow-red" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#fb7185"/>
+    </marker>
+    <marker id="rel-arrow-orange" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+      <path d="M1 1l10 5-10 5z" fill="#fb923c"/>
+    </marker>
+  </defs>
+
+  <rect width="1400" height="980" rx="26" fill="url(#release-bg)"/>
+  <path d="M0 148C245 87 454 181 715 122s465-55 685 13V0H0z" fill="#164e63" opacity="0.16"/>
+  <circle cx="1270" cy="105" r="165" fill="#22d3ee" opacity="0.045"/>
+
+  <text x="70" y="72" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="34" font-weight="700">Release &amp; operations</text>
+  <text x="70" y="107" fill="#9fb6c9" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="17">Every artifact advances through verifiable gates; unsafe releases stop closed</text>
+  <g transform="translate(1080 52)">
+    <rect width="250" height="48" rx="24" fill="#123325" stroke="#4ade80" stroke-opacity="0.65"/>
+    <path d="M22 25l8 8 15-18" fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="57" y="31" fill="#bbf7d0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700">Promote only verified digests</text>
+  </g>
+
+  <!-- Stage labels -->
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">
+    <rect x="55" y="146" width="260" height="34" rx="17" fill="#0d3448"/><text x="185" y="168" text-anchor="middle" fill="#67e8f9">1 · PROVE THE SOURCE</text>
+    <rect x="362" y="146" width="404" height="34" rx="17" fill="#0d3448"/><text x="564" y="168" text-anchor="middle" fill="#67e8f9">2 · BUILD IMMUTABLE ARTIFACTS</text>
+    <rect x="813" y="146" width="532" height="34" rx="17" fill="#123325"/><text x="1079" y="168" text-anchor="middle" fill="#86efac">3 · VERIFY, DEPLOY &amp; OPERATE</text>
+  </g>
+
+  <!-- Top flow -->
+  <g filter="url(#release-shadow)">
+    <rect x="55" y="205" width="250" height="205" rx="22" fill="url(#release-card)" stroke="#28506d"/>
+    <circle cx="102" cy="255" r="28" fill="#082f49" stroke="#22d3ee"/>
+    <path d="M89 245h12l6 7h12v21H89zM94 239h11l5 6" fill="none" stroke="#67e8f9" stroke-width="2.2" stroke-linejoin="round"/>
+    <text x="143" y="248" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Source + CI</text>
+    <text x="143" y="274" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">reviewed change set</text>
+    <rect x="78" y="303" width="204" height="78" rx="12" fill="#0b253b"/>
+    <text x="96" y="329" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• pinned dependencies</text>
+    <text x="96" y="354" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• reproducible pipeline</text>
+  </g>
+
+  <g filter="url(#release-shadow)">
+    <rect x="365" y="205" width="250" height="205" rx="22" fill="url(#release-card)" stroke="#28506d"/>
+    <circle cx="412" cy="255" r="28" fill="#10382f" stroke="#4ade80"/>
+    <path d="M398 255l9 9 19-20" fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="453" y="248" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Test locally</text>
+    <text x="453" y="274" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">before packaging</text>
+    <rect x="388" y="303" width="204" height="78" rx="12" fill="#0b253b"/>
+    <text x="406" y="329" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• unit + integration tests</text>
+    <text x="406" y="354" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• local ACME exercise</text>
+  </g>
+
+  <g filter="url(#release-shadow)">
+    <rect x="675" y="205" width="300" height="205" rx="22" fill="url(#release-card)" stroke="#28506d"/>
+    <rect x="699" y="227" width="58" height="58" rx="14" fill="#082f49" stroke="#22d3ee"/>
+    <path d="M707 242h42v29h-42zM715 235v7M741 235v7M707 253h42" fill="none" stroke="#67e8f9" stroke-width="2"/>
+    <text x="776" y="247" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Build images</text>
+    <text x="776" y="273" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">two controlled artifacts</text>
+    <rect x="699" y="303" width="118" height="78" rx="12" fill="#0b253b"/>
+    <path d="M716 324h22l10 10-10 10h-22l-10-10z" fill="none" stroke="#67e8f9" stroke-width="2"/>
+    <text x="758" y="366" text-anchor="middle" fill="#bae6fd" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Go app</text>
+    <rect x="833" y="303" width="118" height="78" rx="12" fill="#201e25" stroke="#7c4a2a"/>
+    <path d="M850 325h20l8 8v21h-28zM870 325v9h8" fill="none" stroke="#fb923c" stroke-width="2"/>
+    <text x="892" y="366" text-anchor="middle" fill="#fed7aa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Stock Caddy</text>
+    <text x="825" y="399" text-anchor="middle" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">source audit required</text>
+  </g>
+
+  <g filter="url(#release-shadow)">
+    <rect x="1035" y="205" width="310" height="205" rx="22" fill="url(#release-card)" stroke="#35624f"/>
+    <path d="M1062 236h36l9 9v35h-45zM1098 236v10h9" fill="none" stroke="#4ade80" stroke-width="2.2"/>
+    <path d="M1071 258l7 7 15-16" fill="none" stroke="#86efac" stroke-width="2.7" stroke-linecap="round"/>
+    <text x="1124" y="247" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Artifact gates</text>
+    <text x="1124" y="273" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">identity + integrity</text>
+    <rect x="1059" y="303" width="262" height="78" rx="12" fill="#0a2a2b"/>
+    <text x="1080" y="328" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">01 · record immutable digest</text>
+    <text x="1080" y="351" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">02 · sign provenance</text>
+    <text x="1080" y="374" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">03 · vulnerability scan</text>
+  </g>
+
+  <path d="M305 307H354" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+  <path d="M615 307H664" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+  <path d="M975 307H1024" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+
+  <!-- CVE decision -->
+  <g filter="url(#release-shadow)">
+    <path d="M1190 452l143 83-143 83-143-83z" fill="#281a24" stroke="#fb7185" stroke-width="2"/>
+    <path d="M1190 481l25 45-25 45-25-45z" fill="#481c27" stroke="#fda4af" stroke-width="2"/>
+    <path d="M1190 497v23M1190 534v2" stroke="#fecdd3" stroke-width="4" stroke-linecap="round"/>
+    <text x="1190" y="586" text-anchor="middle" fill="#fecdd3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">Blocking CVE?</text>
+  </g>
+  <path d="M1190 410V440" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+  <path d="M1047 535H934" fill="none" stroke="#fb7185" stroke-width="3" marker-end="url(#rel-arrow-red)"/>
+  <g transform="translate(681 492)">
+    <rect width="250" height="86" rx="17" fill="#3b1821" stroke="#fb7185"/>
+    <path d="M22 22l20 20M42 22L22 42" stroke="#fda4af" stroke-width="3" stroke-linecap="round"/>
+    <text x="57" y="31" fill="#fecdd3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="16" font-weight="700">FAIL CLOSED</text>
+    <text x="22" y="64" fill="#fecdd3" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">No deploy; remediate and rebuild</text>
+  </g>
+  <text x="980" y="522" text-anchor="middle" fill="#fda4af" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">YES</text>
+
+  <!-- Deploy and verify path -->
+  <path d="M1190 618v45H287v32" fill="none" stroke="#4ade80" stroke-width="3" marker-end="url(#rel-arrow-green)"/>
+  <text x="1017" y="651" fill="#86efac" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14" font-weight="700">NO · gates passed</text>
+
+  <g filter="url(#release-shadow)">
+    <rect x="55" y="706" width="465" height="188" rx="22" fill="url(#release-card)" stroke="#35624f"/>
+    <rect x="78" y="730" width="58" height="58" rx="14" fill="#10382f" stroke="#4ade80"/>
+    <path d="M88 742h38v30H88zM93 748h10v8H93zM110 748h10v8h-10zM93 761h10v6H93zM110 761h10v6h-10z" fill="none" stroke="#86efac" stroke-width="1.8"/>
+    <text x="155" y="751" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Linux deployment</text>
+    <text x="155" y="777" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">Compose workload · systemd lifecycle</text>
+    <rect x="78" y="810" width="418" height="58" rx="12" fill="#0a2a2b"/>
+    <text x="96" y="834" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Deploy exact signed digests</text>
+    <text x="96" y="856" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Protected state · restart policy · least privilege</text>
+  </g>
+
+  <g filter="url(#release-shadow)">
+    <rect x="560" y="706" width="365" height="188" rx="22" fill="url(#release-card)" stroke="#28506d"/>
+    <circle cx="608" cy="758" r="27" fill="#082f49" stroke="#22d3ee"/>
+    <path d="M594 758h7l6-12 8 25 6-13h9" fill="none" stroke="#67e8f9" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="650" y="751" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Runtime proof</text>
+    <text x="650" y="777" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">readiness + synthetic monitor</text>
+    <rect x="584" y="810" width="317" height="58" rx="12" fill="#0b253b"/>
+    <text x="602" y="834" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Health, TLS, redirect semantics</text>
+    <text x="602" y="856" fill="#cfe3ef" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Path/query preservation from outside</text>
+  </g>
+
+  <g filter="url(#release-shadow)">
+    <rect x="965" y="706" width="380" height="188" rx="22" fill="url(#release-card)" stroke="#7c4a2a"/>
+    <path d="M990 747h50v33h-50zM997 739h36l7 8M1000 760h30" fill="none" stroke="#fb923c" stroke-width="2.3" stroke-linejoin="round"/>
+    <path d="M1015 754v19M1007 765l8 8 8-8" fill="none" stroke="#fdba74" stroke-width="2.2" stroke-linecap="round"/>
+    <text x="1057" y="751" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Recovery operations</text>
+    <text x="1057" y="777" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">deliberate, tested, reversible</text>
+    <text x="990" y="819" fill="#fed7aa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• encrypted age backup</text>
+    <text x="990" y="842" fill="#fed7aa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• restore into a new directory</text>
+    <text x="990" y="865" fill="#fed7aa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">• explicit operator rollback</text>
+  </g>
+
+  <path d="M520 800H549" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+  <path d="M925 800H954" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
+  <path d="M1155 894v35H288v-24" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#rel-arrow-orange)"/>
+  <text x="720" y="950" text-anchor="middle" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">rollback selects an explicit known-good release; never mutates the backup in place</text>
+
+  <!-- External gates -->
+  <g transform="translate(55 455)" filter="url(#release-shadow)">
+    <rect width="500" height="137" rx="21" fill="#17253a" stroke="#fb923c" stroke-width="1.5"/>
+    <path d="M28 36a22 22 0 1044 0 22 22 0 10-44 0M29 36h42M50 14c7 8 10 15 10 22s-3 14-10 22M50 14c-7 8-10 15-10 22s3 14 10 22" fill="none" stroke="#fdba74" stroke-width="2"/>
+    <text x="91" y="31" fill="#fff7ed" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="19" font-weight="700">External launch gates</text>
+    <text x="91" y="57" fill="#fed7aa" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Required before production / public traffic</text>
+    <rect x="25" y="78" width="450" height="37" rx="10" fill="#2b2427"/>
+    <text x="250" y="102" text-anchor="middle" fill="#ffedd5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">DNS ownership · public IP · firewall · CA policy · operator approval</text>
+  </g>
+  <path d="M555 524H657" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#rel-arrow-orange)"/>
+  <text x="606" y="510" text-anchor="middle" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">launch prerequisite</text>
+</svg>

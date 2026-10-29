@@ -1,0 +1,75 @@
+name: apex-redirect
+services:
+  app:
+    image: ${APP_IMAGE:?Set APP_IMAGE to a complete immutable release reference}
+    network_mode: host
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 256m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      HTTP_ADDR: 127.0.0.1:8080
+      ASK_ADDR: 127.0.0.1:8081
+      STATE_PATH: /var/lib/apex-redirect/state.db
+      SERVICE_PUBLIC_IPS: ${SERVICE_PUBLIC_IPS:?Set actual public service addresses}
+      MODE: ${MODE:-selfhost}
+      ALLOWED_DOMAINS: ${ALLOWED_DOMAINS:-}
+      DNS_RESOLVERS: ${DNS_RESOLVERS:-1.1.1.1:53,8.8.8.8:53}
+      DNS_TIMEOUT: ${DNS_TIMEOUT:-3s}
+      DNS_CACHE_TTL: ${DNS_CACHE_TTL:-30s}
+      DNS_NEGATIVE_TTL: ${DNS_NEGATIVE_TTL:-5s}
+      ADMISSION_ENABLED: ${ADMISSION_ENABLED:-true}
+      MAX_DOMAINS: ${MAX_DOMAINS:-1000}
+      ADMISSIONS_PER_WINDOW: ${ADMISSIONS_PER_WINDOW:-100}
+      ADMISSION_WINDOW: ${ADMISSION_WINDOW:-24h}
+      TRUSTED_PROXIES: 127.0.0.1/32,::1/128
+    volumes:
+      - type: bind
+        source: ${APEX_DATA_DIR:?Set absolute protected persistent data directory}/app
+        target: /var/lib/apex-redirect
+        bind:
+          create_host_path: false
+  caddy:
+    image: ${CADDY_IMAGE:?Set CADDY_IMAGE to an accepted signed immutable stock Caddy release}
+    network_mode: host
+    user: "10002:10002"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    stop_grace_period: 20s
+    mem_limit: 512m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on: [app]
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set operator ACME contact}
+      ACME_CA: ${ACME_CA:-https://acme-staging-v02.api.letsencrypt.org/directory}
+      CADDY_STORAGE: /var/lib/caddy
+      XDG_DATA_HOME: /var/lib/caddy
+      XDG_CONFIG_HOME: /var/lib/caddy/config
+    command: [caddy, run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+    volumes:
+      - type: bind
+        source: ./Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+      - type: bind
+        source: ${APEX_DATA_DIR}/caddy
+        target: /var/lib/caddy
+        bind:
+          create_host_path: false

@@ -1,0 +1,15 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+**/*.db*
+**/*.key
+**/*.pem
+**/*.tar*
+deploy
+scripts
+tests
+data
+.integration-*
+apex-redirect

@@ -6,5 +6,20 @@
 /coverage.out
 /coverage.html
 
+# Local configuration, private policy state and encrypted backups
+/.env
+/.env.*
+!/.env.example
+/.state/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.age
+__pycache__/
+
 # macOS
 .DS_Store
+
+PLAN.md
+PLAN_COMPARISON.md

@@ -1,12 +1,14 @@
 [Unit]
 Description=Apex-to-www redirect service
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=apex-redirect
 Group=apex-redirect
 EnvironmentFile=/etc/default/apex-redirect
+Environment=HTTP_ADDR=127.0.0.1:8080 ASK_ADDR=127.0.0.1:8081 STATE_PATH=/var/lib/apex-redirect/state.db
 ExecStart=/usr/local/bin/apex-redirect
 Restart=on-failure
 RestartSec=3
@@ -14,6 +16,18 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+StateDirectory=apex-redirect
+StateDirectoryMode=0700
+UMask=0077
+ReadWritePaths=/var/lib/apex-redirect
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+MemoryMax=256M
+TasksMax=128
 
 [Install]
 WantedBy=multi-user.target

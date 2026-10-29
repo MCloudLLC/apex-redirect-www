@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -11,138 +12,165 @@ import (
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
-	"golang.org/x/net/publicsuffix"
+	"mc-apex-redirect/internal/domain"
+	"mc-apex-redirect/internal/policy"
+	"mc-apex-redirect/internal/state"
 )
 
-const (
-	defaultHTTPAddr = "127.0.0.1:8080"
-	// Caddy is expected to run on the same host and call this loopback-only
-	// endpoint. It must not be exposed through a separately public listener.
-	defaultAskAddr = "127.0.0.1:8081"
+const clientIPHeader = "X-Apex-Client-IP"
 
-	dnsCacheTTL         = 30 * time.Second
-	negativeDNSCacheTTL = 5 * time.Second
-	maxDNSCacheEntries  = 4096
-)
-
-type ipLookup interface {
-	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
+type eligibilityPolicy interface {
+	Check(context.Context, string) error
 }
 
-type dnsCacheEntry struct {
-	checkedAt time.Time
-	allowed   bool
-	inFlight  bool
-	done      chan struct{}
+type abuseState interface {
+	CheckBlocked(context.Context, string, netip.Addr) (bool, error)
+	ReserveAdmission(context.Context, string) error
+	Ping(context.Context) error
+}
+
+type serviceMetrics struct {
+	redirects atomic.Uint64
+	denied    atomic.Uint64
+	failures  atomic.Uint64
+	admitted  atomic.Uint64
 }
 
 type redirectService struct {
-	serviceIPs map[netip.Addr]struct{}
-	resolver   ipLookup
-	cacheMu    sync.Mutex
-	dnsCache   map[string]*dnsCacheEntry
+	policy           eligibilityPolicy
+	store            abuseState
+	publicMode       bool
+	allowedDomains   map[string]struct{}
+	trustedProxies   []netip.Prefix
+	admissionEnabled bool
+	metrics          serviceMetrics
 }
 
 func main() {
-	serviceIPs, err := configuredServiceIPs(os.Getenv("SERVICE_PUBLIC_IPS"))
-	if err != nil {
-		log.Fatalf("invalid SERVICE_PUBLIC_IPS: %v", err)
+	if err := run(os.Args[1:], os.Stdout); err != nil {
+		log.Printf("apex-redirect: %v", err)
+		os.Exit(1)
 	}
+}
 
-	httpAddr := envOrDefault("HTTP_ADDR", defaultHTTPAddr)
-	askAddr := envOrDefault("ASK_ADDR", defaultAskAddr)
-	if err := validatePrivateListenAddr(askAddr); err != nil {
-		log.Fatalf("invalid ASK_ADDR: %v", err)
-	}
-
-	publicListener, err := net.Listen("tcp", httpAddr)
-	if err != nil {
-		log.Fatalf("listen on %s: %v", httpAddr, err)
-	}
-	askListener, err := net.Listen("tcp", askAddr)
-	if err != nil {
-		_ = publicListener.Close()
-		log.Fatalf("listen on private ask endpoint %s: %v", askAddr, err)
-	}
-
-	service := &redirectService{
-		serviceIPs: serviceIPs,
-		resolver:   net.DefaultResolver,
-	}
-	publicServer := newHTTPServer(http.HandlerFunc(service.redirectHandler))
-	askMux := http.NewServeMux()
-	askMux.HandleFunc("/ask", service.askHandler)
-	askServer := newHTTPServer(askMux)
-
-	errs := make(chan error, 2)
-	go func() { errs <- publicServer.Serve(publicListener) }()
-	go func() { errs <- askServer.Serve(askListener) }()
-
-	log.Printf("HTTP redirect server listening on %s", publicListener.Addr())
-	log.Printf("private Caddy ask endpoint listening on %s", askListener.Addr())
-	if len(serviceIPs) == 0 {
-		log.Print("SERVICE_PUBLIC_IPS is unset; redirects and TLS approvals are disabled")
-	}
-
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case sig := <-signals:
-		log.Printf("received %s; shutting down", sig)
-	case err := <-errs:
-		if !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("server stopped: %v", err)
+func run(args []string, out io.Writer) error {
+	if len(args) > 0 {
+		switch args[0] {
+		case "block", "admissions":
+			return runOperator(args, out)
+		case "help", "-h", "--help":
+			_, err := fmt.Fprintln(out, "Usage: apex-redirect [serve | block add/list/remove | admissions list/forget]\nConfigure the service through environment variables; see deploy/config.env.example.")
+			return err
+		case "serve":
+			if len(args) != 1 {
+				return errors.New("serve accepts no arguments")
+			}
+		default:
+			return fmt.Errorf("unknown command %q; use help", args[0])
 		}
 	}
-	signal.Stop(signals)
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	store, err := state.Open(cfg.statePath, cfg.limits)
+	if err != nil {
+		return fmt.Errorf("open policy state: %w", err)
+	}
+	defer store.Close()
+	dnsPolicy, err := policy.New(cfg.dns)
+	if err != nil {
+		return fmt.Errorf("configure DNS policy: %w", err)
+	}
+	service := &redirectService{
+		policy: dnsPolicy, store: store, publicMode: cfg.publicMode,
+		allowedDomains: cfg.allowedDomains, trustedProxies: cfg.trustedProxies,
+		admissionEnabled: cfg.admissionEnabled,
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	return serve(ctx, cfg, service)
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+func serve(ctx context.Context, cfg config, service *redirectService) error {
+	redirectListener, err := net.Listen("tcp", cfg.httpAddr)
+	if err != nil {
+		return fmt.Errorf("listen for private proxied requests: %w", err)
+	}
+	defer redirectListener.Close()
+	controlListener, err := net.Listen("tcp", cfg.askAddr)
+	if err != nil {
+		return fmt.Errorf("listen for private control requests: %w", err)
+	}
+	defer controlListener.Close()
+	redirectServer := newHTTPServer(http.HandlerFunc(service.redirectHandler))
+	controlServer := newHTTPServer(service.controlHandler())
+	errs := make(chan error, 2)
+	go func() { errs <- redirectServer.Serve(redirectListener) }()
+	go func() { errs <- controlServer.Serve(controlListener) }()
+	log.Printf("private redirect listener=%s control listener=%s public_mode=%t", redirectListener.Addr(), controlListener.Addr(), cfg.publicMode)
+	var serveErr error
+	select {
+	case <-ctx.Done():
+	case err := <-errs:
+		if !errors.Is(err, http.ErrServerClosed) {
+			serveErr = fmt.Errorf("HTTP server stopped: %w", err)
+		}
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_ = publicServer.Shutdown(ctx)
-	_ = askServer.Shutdown(ctx)
-	_ = publicListener.Close()
-	_ = askListener.Close()
+	for _, server := range []*http.Server{redirectServer, controlServer} {
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			serveErr = errors.Join(serveErr, fmt.Errorf("graceful shutdown: %w", err))
+			if closeErr := server.Close(); closeErr != nil {
+				serveErr = errors.Join(serveErr, closeErr)
+			}
+		}
+	}
+	return serveErr
 }
 
 func newHTTPServer(handler http.Handler) *http.Server {
 	return &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		Handler: handler, ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second,
+		IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10,
 	}
 }
 
 func (s *redirectService) redirectHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/healthz" {
-		if !allowGetHead(w, r) {
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok\n"))
-		return
-	}
 	if !allowGetHead(w, r) {
 		return
 	}
-
-	apex, ok := validateApex(r.Host)
-	if !ok || !s.isConfiguredPublicApex(r.Context(), apex) {
-		http.Error(w, "unrecognized host", http.StatusMisdirectedRequest)
+	apex, err := domain.Apex(r.Host)
+	if err != nil {
+		s.reject(w, http.StatusMisdirectedRequest, "unrecognized host")
 		return
 	}
-
-	// apex is a validated DNS name (no port, path, userinfo, or URL delimiters),
-	// and RequestURI preserves the original escaped path and raw query.
+	if r.TLS != nil {
+		sni, err := domain.Normalize(r.TLS.ServerName)
+		if err != nil || sni != apex {
+			s.reject(w, http.StatusMisdirectedRequest, "TLS server name does not match host")
+			return
+		}
+	}
+	client, err := s.clientIP(r)
+	if err != nil {
+		s.reject(w, http.StatusMisdirectedRequest, "invalid client address")
+		return
+	}
+	if !s.authorize(w, r, apex, client, false) {
+		return
+	}
+	// EscapedPath and RawQuery must not be decoded and re-escaped.
 	target := "https://www." + apex + r.URL.RequestURI()
 	w.Header().Set("Location", target)
 	w.WriteHeader(http.StatusMovedPermanently)
+	s.metrics.redirects.Add(1)
 }
 
 func (s *redirectService) askHandler(w http.ResponseWriter, r *http.Request) {
@@ -151,18 +179,150 @@ func (s *redirectService) askHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	values := r.URL.Query()["domain"]
-	if len(values) != 1 {
-		http.Error(w, "domain must be specified once", http.StatusBadRequest)
+	query, err := parseAskQuery(r.URL.RawQuery)
+	if err != nil {
+		s.reject(w, http.StatusBadRequest, "specify domain exactly once")
 		return
 	}
-	apex, ok := validateApex(values[0])
-	if !ok || !s.isConfiguredPublicApex(r.Context(), apex) {
-		http.Error(w, "domain not approved", http.StatusForbidden)
+	apex, err := domain.Apex(query)
+	if err != nil {
+		s.reject(w, http.StatusForbidden, "domain not approved")
+		return
+	}
+	if !s.authorize(w, r, apex, netip.Addr{}, true) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("approved\n"))
+	_, _ = io.WriteString(w, "approved\n")
+	s.metrics.admitted.Add(1)
+}
+
+func (s *redirectService) authorize(w http.ResponseWriter, r *http.Request, apex string, client netip.Addr, admission bool) bool {
+	if s.store == nil || s.policy == nil {
+		s.reject(w, http.StatusServiceUnavailable, "policy unavailable")
+		return false
+	}
+	blocked, err := s.store.CheckBlocked(r.Context(), apex, client)
+	if err != nil {
+		log.Printf("block policy lookup failed: %v", err)
+		s.reject(w, http.StatusServiceUnavailable, "policy unavailable")
+		return false
+	}
+	if blocked {
+		s.reject(w, http.StatusForbidden, "access blocked")
+		return false
+	}
+	if !s.publicMode {
+		if _, ok := s.allowedDomains[apex]; !ok {
+			s.reject(w, http.StatusForbidden, "domain not allowed")
+			return false
+		}
+	}
+	if err := s.policy.Check(r.Context(), apex); err != nil {
+		if errors.Is(err, policy.ErrIneligible) {
+			status := http.StatusMisdirectedRequest
+			if admission {
+				status = http.StatusForbidden
+			}
+			s.reject(w, status, "domain does not meet DNS policy")
+		} else {
+			s.reject(w, http.StatusServiceUnavailable, "DNS policy unavailable")
+		}
+		return false
+	}
+	if admission {
+		if !s.admissionEnabled {
+			s.reject(w, http.StatusServiceUnavailable, "certificate admission disabled")
+			return false
+		}
+		if err := s.store.ReserveAdmission(r.Context(), apex); err != nil {
+			switch {
+			case errors.Is(err, state.ErrBlocked):
+				s.reject(w, http.StatusForbidden, "access blocked")
+			case errors.Is(err, state.ErrCapacity), errors.Is(err, state.ErrRateLimited):
+				w.Header().Set("Retry-After", "300")
+				s.reject(w, http.StatusServiceUnavailable, "certificate admission capacity unavailable")
+			default:
+				log.Printf("certificate admission state failed: %v", err)
+				s.reject(w, http.StatusServiceUnavailable, "admission state unavailable")
+			}
+			return false
+		}
+	}
+	return true
+}
+
+func (s *redirectService) clientIP(r *http.Request) (netip.Addr, error) {
+	peer, err := netip.ParseAddrPort(r.RemoteAddr)
+	if err != nil {
+		return netip.Addr{}, err
+	}
+	ip := peer.Addr().Unmap()
+	for _, prefix := range s.trustedProxies {
+		if prefix.Contains(ip) {
+			values := r.Header.Values(clientIPHeader)
+			if len(values) != 1 {
+				return netip.Addr{}, errors.New("trusted proxy must supply one client address")
+			}
+			forwarded, err := netip.ParseAddr(values[0])
+			if err != nil || forwarded.Zone() != "" {
+				return netip.Addr{}, errors.New("invalid trusted proxy client address")
+			}
+			return forwarded.Unmap(), nil
+		}
+	}
+	return ip, nil
+}
+
+func (s *redirectService) controlHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ask", s.askHandler)
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if allowGetHead(w, r) {
+			w.WriteHeader(http.StatusOK)
+			if r.Method != http.MethodHead {
+				_, _ = io.WriteString(w, "ok\n")
+			}
+		}
+	})
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		if !allowGetHead(w, r) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+		defer cancel()
+		if s.store == nil || s.policy == nil {
+			http.Error(w, "policy unavailable", http.StatusServiceUnavailable)
+		} else if err := s.store.Ping(ctx); err != nil {
+			http.Error(w, "state unavailable", http.StatusServiceUnavailable)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			if r.Method != http.MethodHead {
+				_, _ = io.WriteString(w, "ready\n")
+			}
+		}
+	})
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if !allowGetHead(w, r) {
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		if r.Method != http.MethodHead {
+			_, _ = fmt.Fprintf(w, "# TYPE apex_redirects_total counter\napex_redirects_total %d\n# TYPE apex_denied_total counter\napex_denied_total %d\n# TYPE apex_failures_total counter\napex_failures_total %d\n# TYPE apex_admissions_total counter\napex_admissions_total %d\n",
+				s.metrics.redirects.Load(), s.metrics.denied.Load(), s.metrics.failures.Load(), s.metrics.admitted.Load())
+		}
+	})
+	return mux
+}
+
+func (s *redirectService) reject(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Cache-Control", "no-store")
+	if status >= 500 {
+		s.metrics.failures.Add(1)
+	} else {
+		s.metrics.denied.Add(1)
+	}
+	http.Error(w, message, status)
 }
 
 func allowGetHead(w http.ResponseWriter, r *http.Request) bool {
@@ -170,200 +330,19 @@ func allowGetHead(w http.ResponseWriter, r *http.Request) bool {
 		return true
 	}
 	w.Header().Set("Allow", "GET, HEAD")
+	w.Header().Set("Cache-Control", "no-store")
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	return false
 }
 
-func (s *redirectService) isConfiguredPublicApex(ctx context.Context, apex string) bool {
-	if len(s.serviceIPs) == 0 || s.resolver == nil {
-		return false
-	}
-
-	for {
-		now := time.Now()
-		s.cacheMu.Lock()
-		entry, exists := s.dnsCache[apex]
-		if exists && entry.inFlight {
-			done := entry.done
-			s.cacheMu.Unlock()
-			select {
-			case <-done:
-				continue
-			case <-ctx.Done():
-				return false
-			}
-		}
-		if exists && now.Sub(entry.checkedAt) < dnsCacheEntryTTL(entry.allowed) {
-			s.cacheMu.Unlock()
-			return entry.allowed
-		}
-
-		if !exists && len(s.dnsCache) >= maxDNSCacheEntries {
-			s.evictOldestDNSCacheEntry(now)
-		}
-		if s.dnsCache == nil {
-			s.dnsCache = make(map[string]*dnsCacheEntry)
-		}
-		if len(s.dnsCache) >= maxDNSCacheEntries {
-			s.cacheMu.Unlock()
-			return s.lookupConfiguredPublicApex(ctx, apex)
-		}
-
-		entry = &dnsCacheEntry{inFlight: true, done: make(chan struct{})}
-		s.dnsCache[apex] = entry
-		s.cacheMu.Unlock()
-
-		allowed := s.lookupConfiguredPublicApex(ctx, apex)
-
-		s.cacheMu.Lock()
-		entry.allowed = allowed
-		entry.checkedAt = time.Now()
-		entry.inFlight = false
-		close(entry.done)
-		s.cacheMu.Unlock()
-		return allowed
-	}
-}
-
-func dnsCacheEntryTTL(allowed bool) time.Duration {
-	if allowed {
-		return dnsCacheTTL
-	}
-	return negativeDNSCacheTTL
-}
-
-func (s *redirectService) evictOldestDNSCacheEntry(now time.Time) {
-	var oldestKey string
-	var oldest time.Time
-	for key, entry := range s.dnsCache {
-		if entry.inFlight {
-			continue
-		}
-		if now.Sub(entry.checkedAt) >= dnsCacheEntryTTL(entry.allowed) {
-			delete(s.dnsCache, key)
-			continue
-		}
-		if oldestKey == "" || entry.checkedAt.Before(oldest) {
-			oldestKey, oldest = key, entry.checkedAt
-		}
-	}
-	if oldestKey != "" && len(s.dnsCache) >= maxDNSCacheEntries {
-		delete(s.dnsCache, oldestKey)
-	}
-}
-
-func (s *redirectService) lookupConfiguredPublicApex(ctx context.Context, apex string) bool {
-	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-	defer cancel()
-
-	addresses, err := s.resolver.LookupIPAddr(ctx, apex)
-	if err != nil || len(addresses) == 0 {
-		return false
-	}
-	for _, address := range addresses {
-		ip, ok := netip.AddrFromSlice(address.IP)
-		if !ok {
-			return false
-		}
-		ip = ip.Unmap()
-		if !isPublicIP(ip) {
-			return false
-		}
-		if _, ok := s.serviceIPs[ip]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-func validateApex(host string) (string, bool) {
-	if host == "" || strings.ContainsAny(host, ":/%\\@[]") {
-		return "", false
-	}
-	host = strings.ToLower(host)
-	if len(host) > 253 || strings.HasSuffix(host, ".") || net.ParseIP(host) != nil {
-		return "", false
-	}
-	labels := strings.Split(host, ".")
-	if len(labels) < 2 {
-		return "", false
-	}
-	for _, label := range labels {
-		if label == "" || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
-			return "", false
-		}
-		for _, ch := range label {
-			if (ch < 'a' || ch > 'z') && (ch < '0' || ch > '9') && ch != '-' {
-				return "", false
-			}
-		}
-	}
-
-	registered, err := publicsuffix.EffectiveTLDPlusOne(host)
-	if err != nil || registered != host {
-		return "", false
-	}
-	return host, true
-}
-
-func configuredServiceIPs(value string) (map[netip.Addr]struct{}, error) {
-	result := make(map[netip.Addr]struct{})
-	if strings.TrimSpace(value) == "" {
-		return result, nil
-	}
-	for _, part := range strings.Split(value, ",") {
-		ip, err := netip.ParseAddr(strings.TrimSpace(part))
-		if err != nil {
-			return nil, fmt.Errorf("%q is not an IP address", part)
-		}
-		ip = ip.Unmap()
-		if !isPublicIP(ip) {
-			return nil, fmt.Errorf("%s is not a public IP address", ip)
-		}
-		result[ip] = struct{}{}
-	}
-	return result, nil
-}
-
-func isPublicIP(ip netip.Addr) bool {
-	if !ip.IsValid() || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() ||
-		ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
-		return false
-	}
-	if ip.Is4() {
-		return !inPrefixes(ip,
-			"0.0.0.0/8",
-			"100.64.0.0/10",
-			"192.0.0.0/24",
-			"192.0.2.0/24",
-			"192.88.99.0/24",
-			"198.18.0.0/15",
-			"198.51.100.0/24",
-			"203.0.113.0/24",
-			"224.0.0.0/4",
-			"240.0.0.0/4",
-		)
-	}
-	return ip.Is6() && ip.IsGlobalUnicast() && !inPrefixes(ip, "2001:db8::/32")
-}
-
-func inPrefixes(ip netip.Addr, prefixes ...string) bool {
-	for _, text := range prefixes {
-		if netip.MustParsePrefix(text).Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
 func validatePrivateListenAddr(address string) error {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return fmt.Errorf("ASK_ADDR must be a loopback IP and port: %w", err)
+	host, port, err := net.SplitHostPort(address)
+	if err != nil || port == "" {
+		return errors.New("listener must use a loopback IP and port")
 	}
 	ip, err := netip.ParseAddr(host)
-	if err != nil || !ip.IsLoopback() {
-		return fmt.Errorf("ASK_ADDR must bind to a loopback IP")
+	if err != nil || ip.Zone() != "" || !ip.IsLoopback() {
+		return errors.New("listener must bind to a loopback IP")
 	}
 	return nil
 }

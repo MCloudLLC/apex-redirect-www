@@ -23,8 +23,10 @@ on a different image or distribution.
 
 ### 1. Create the VM and firewall rules
 
-A practical starting size for the single-host beta is 2 vCPUs, 2 GB RAM, and
-20 GB of persistent disk. Reserve a stable public IPv4 address. Add IPv6 only
+A practical starting size for the single-host beta is an amd64 (x86-64) VM with
+2 vCPUs, 2 GB RAM, and 20 GB of persistent disk. The current release workflow
+publishes only amd64 runtime images. Reserve a stable public IPv4 address.
+Add IPv6 only
 after verifying that the provider, VM, firewall, DNS, ACME, and monitoring paths
 all support it.
 

@@ -176,7 +176,21 @@ elif args[0] == "inspect":
         self.assertIn("container restarted during readiness", restarted.stderr)
         result = self.invoke("release.sh")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("127.0.0.1:2019/config/", self.trace.read_text())
+        commands = self.trace.read_text()
+        self.assertIn("127.0.0.1:2019/config/", commands)
+        self.assertIn(
+            "run --rm --no-deps caddy validate --config "
+            "/etc/caddy/Caddyfile --adapter caddyfile",
+            commands,
+        )
+
+    def test_caddy_compose_command_uses_image_entrypoint(self):
+        compose = (ROOT / "deploy/compose.yaml").read_text()
+        self.assertIn(
+            "command: [run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]",
+            compose,
+        )
+        self.assertNotIn("command: [caddy, run", compose)
 
     def test_backup_of_stopped_release_neither_quiesces_nor_starts_services(self):
         result = self.invoke("snapshot.sh", "backup", self.work / "backup.age",

@@ -62,7 +62,7 @@ services:
       CADDY_STORAGE: /var/lib/caddy
       XDG_DATA_HOME: /var/lib/caddy
       XDG_CONFIG_HOME: /var/lib/caddy/config
-    command: [caddy, run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
+    command: [run, --config, /etc/caddy/Caddyfile, --adapter, caddyfile]
     volumes:
       - type: bind
         source: ./Caddyfile

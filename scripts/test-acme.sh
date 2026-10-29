@@ -9,6 +9,11 @@ h2binary="$PWD/.integration-h2-$name"
 trap 'rm -f "$binary" "$h2binary"' EXIT
 CGO_ENABLED=0 go build -o "$binary" .
 CGO_ENABLED=0 go build -o "$h2binary" ./tests/integration/h2probe
+if test "${ACME_TEST_NATIVE:-}" = 1; then
+  APEX_TEST_BINARY="$binary" APEX_H2_BINARY="$h2binary" \
+    python3 -m unittest discover -s tests/integration -p test_local_acme.py -v
+  exit
+fi
 docker run --rm --name "$name" \
   --user "$(id -u):$(id -g)" --group-add "$(stat -c %g /var/run/docker.sock)" \
   -e "TEST_DOCKER_NETWORK=container:$name" -e "APEX_TEST_BINARY=$binary" \

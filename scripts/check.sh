@@ -18,8 +18,6 @@ docker run --rm -v "$PWD/deploy/Caddyfile:/Caddyfile:ro" "$caddy_image" \
 docker run --rm -v "$PWD/deploy/Caddyfile:/Caddyfile:ro" "$caddy_image" \
   caddy validate --config /Caddyfile --adapter caddyfile
 # Render only; deliberately synthetic values never start services or request certs.
-APP_IMAGE="example.invalid/apex@sha256:$(printf '1%.0s' {1..64})" \
-CADDY_IMAGE="$caddy_image" \
 SERVICE_PUBLIC_IPS=93.184.216.34 ACME_EMAIL=ci@example.invalid \
-ALLOWED_DOMAINS=example.com APEX_DATA_DIR="$PWD/data" \
+  ALLOWED_DOMAINS=example.com APEX_DATA_DIR="$PWD/data" \
   docker compose --env-file /dev/null -f deploy/compose.yaml config --quiet

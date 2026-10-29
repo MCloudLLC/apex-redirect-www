@@ -4,8 +4,7 @@ This runbook describes a self-hosted deployment of the apex-to-www redirect
 service. Operators are responsible for deciding whether their infrastructure,
 policies, monitoring, recovery evidence, and legal posture are production-ready.
 
-See the [runtime architecture](assets/runtime-architecture.svg) and
-[release operations](assets/release-operations.svg) diagrams.
+See the [runtime architecture](assets/runtime-architecture.svg) diagram.
 
 ## Ubuntu VM quick start
 
@@ -14,8 +13,8 @@ Ubuntu 24.04 LTS VM and uses Docker Compose. Ubuntu 22.04 or 26.04 can use the
 same Docker repository instructions, but test the complete flow before relying
 on a different image or distribution.
 
-> Use only a published release tag and the two signed image digests recorded by
-> its workflow. Branch builds and example digest values are not releases.
+> Set `RELEASE_VERSION` to a published tag. MCloudLLC publishes matching app and
+> Caddy images for each release.
 
 ### 1. Create the VM and firewall rules
 
@@ -33,7 +32,7 @@ At the cloud/provider firewall, allow:
 | Inbound | TCP 22 | Your administration addresses only | SSH |
 | Inbound | TCP 80 | Internet | HTTP and ACME HTTP-01 |
 | Inbound | TCP 443 | Internet | HTTPS |
-| Outbound | TCP 443 | Internet | Images, signatures, ACME, and updates |
+| Outbound | TCP 443 | Internet | Images, ACME, and updates |
 | Outbound | TCP/UDP 53 | Configured DNS resolvers | Domain-policy DNS checks |
 
 Do not expose TCP 8080, 8081, or 2019. They must remain on loopback. Apply
@@ -85,36 +84,7 @@ sudo docker compose version
 Use `sudo` or a root login shell for Docker administration. Do not add routine
 users to the `docker` group merely for convenience.
 
-### 3. Install the pinned Cosign verifier
-
-The release helper uses Cosign to verify both runtime images. Install the same
-v2.6.1 release used by this repository's release workflow, with a checksum
-selected for the VM architecture:
-
-```bash
-case "$(dpkg --print-architecture)" in
-  amd64)
-    COSIGN_SHA256=5a31765dec30bcf73bd16a055945575396a723b91ee7f1514540603e452ce31b
-    ;;
-  arm64)
-    COSIGN_SHA256=21d2963a0899f82a4461faa3e3783827a73fe37c712505ea2db01ccfa9a5a77b
-    ;;
-  *)
-    echo "Use an officially supported Cosign package for this architecture." >&2
-    exit 1
-    ;;
-esac
-
-curl -fL -o /tmp/cosign.deb \
-  "https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign_2.6.1_$(dpkg --print-architecture).deb" &&
-  printf '%s  %s\n' "$COSIGN_SHA256" /tmp/cosign.deb | sha256sum --check - &&
-  sudo apt install -y /tmp/cosign.deb
-rm /tmp/cosign.deb
-cosign version
-age --version
-```
-
-### 4. Install the deployment files
+### 3. Install the deployment files
 
 Clone the repository into a predictable operator-owned location:
 
@@ -145,7 +115,7 @@ These directories contain the SQLite policy database, ACME account, private
 keys, and certificates. Put them on persistent storage, include them in
 encrypted backups, and never run `docker compose down -v`.
 
-### 5. Create the deployment configuration
+### 4. Create the deployment configuration
 
 Create one root-owned configuration file from the supplied example:
 
@@ -158,8 +128,7 @@ sudoedit /etc/apex-redirect/config.env
 
 Replace every `REPLACE_...` value. Use:
 
-- the exact app and Caddy digest references from the accepted GitHub release;
-- the release's exact signing identity, including its `refs/tags/vX.Y.Z`;
+- one published `RELEASE_VERSION` for both MCloudLLC images;
 - the VM's actual stable public address in `SERVICE_PUBLIC_IPS`;
 - an operator-controlled contact address in `ACME_EMAIL`;
 - `MODE=selfhost` and one or more owned domains in `ALLOWED_DOMAINS` for the
@@ -170,7 +139,7 @@ The configuration file contains no private key, but keep it root-controlled to
 prevent unauthorized operational changes. Shell scripts do not load it
 automatically.
 
-### 6. Run preflight and deploy to staging
+### 5. Run preflight and deploy to staging
 
 Load the configuration into a root shell, run the fail-closed checks, and start
 the accepted images:
@@ -182,16 +151,13 @@ set -a
 . /etc/apex-redirect/config.env
 set +a
 
-python3 scripts/preflight.py
 bash scripts/release.sh
 ```
 
-`release.sh` verifies immutable digests and signatures, scans both images for
-HIGH/CRITICAL vulnerabilities, validates Compose and Caddy, starts the
-containers, and checks for restarts. Do not replace it with a direct
-`docker compose up` command.
+`release.sh` validates the host configuration, pulls the matching MCloudLLC
+images, validates Caddy, starts the containers, and checks for restarts.
 
-### 7. Verify the VM locally
+### 6. Verify the VM locally
 
 Still in the configured root shell, run:
 
@@ -208,7 +174,7 @@ docker compose --env-file /dev/null -f deploy/compose.yaml logs --tail=100
 All containers must be running without a restart loop. The local checks do not
 prove that public DNS, firewall rules, or certificate issuance work.
 
-### 8. Configure an owned test domain
+### 7. Configure an owned test domain
 
 For a domain listed in `ALLOWED_DOMAINS`, configure:
 
@@ -233,7 +199,7 @@ Expect `301` and a `Location` header for the same path and query on
 `https://www.example.com`. `--insecure` is expected only during staging because
 staging certificates are not browser-trusted.
 
-### 9. Enable production certificates
+### 8. Enable production certificates
 
 Only after staging DNS, redirects, monitoring, backups, and recovery have been
 reviewed, edit `/etc/apex-redirect/config.env`:
@@ -249,14 +215,13 @@ Reload the file and run the same release command:
 set -a
 . /etc/apex-redirect/config.env
 set +a
-python3 scripts/preflight.py
 bash scripts/release.sh
 ```
 
 Test HTTPS again without `--insecure` and inspect the certificate presented to
 the owned test domain.
 
-### 10. Routine commands
+### 9. Routine commands
 
 Run these from `/opt/apex-redirect-www` after loading the configuration:
 
@@ -279,9 +244,8 @@ bash scripts/release.sh
 ```
 
 Before an upgrade, create an encrypted backup. Then check out the new release
-tag, update both image digests and the exact signing identity in
-`config.env`, reload it, and run `scripts/release.sh`. Never update only one
-image or use mutable tags such as `latest`.
+tag, set the same `RELEASE_VERSION` in `config.env`, reload it, and run
+`scripts/release.sh`.
 
 ## Deployed components and request flow
 
@@ -351,8 +315,7 @@ Export reviewed non-secret settings explicitly; scripts do not load dotenv
 files. Start from [deploy/config.env.example](../deploy/config.env.example):
 
 - `APEX_DATA_DIR`, `SERVICE_PUBLIC_IPS`, `ACME_EMAIL`
-- immutable `APP_IMAGE` and `CADDY_IMAGE` digest references
-- exact `RELEASE_CERTIFICATE_IDENTITY`
+- one published `RELEASE_VERSION` for both MCloudLLC images
 - `MODE=selfhost` plus `ALLOWED_DOMAINS`, or approved `MODE=public`
 - ACME issuer, DNS resolvers, and admission limits
 
@@ -379,26 +342,19 @@ path because the release and recovery automation targets it.
 Run from the repository root with the reviewed environment exported:
 
 ```bash
-python3 scripts/preflight.py
 bash scripts/release.sh
 ```
 
-Preflight fails closed unless the host is Linux, both image references are
-nonzero SHA-256 digests, public service IPs are real global addresses, required
+The release helper runs preflight first. Preflight fails closed unless the host
+is Linux, `RELEASE_VERSION` is a valid
+container tag, public service IPs are real global addresses, required
 directories and ownership are correct, admission is enabled, and mode/issuer
 approvals are present.
 
-`release.sh` then requires **both** images to:
-
-1. match immutable digest references;
-2. pass keyless Cosign verification against the exact approved GitHub workflow
-   identity; and
-3. pass the pinned Trivy HIGH/CRITICAL vulnerability gate.
-
-It also renders Compose, pulls images, validates the Caddy configuration,
-starts without building, verifies the exact running images, checks app
-readiness and Caddy administration, and rejects a restart during those checks.
-Do not waive a signature, digest, or scanner failure.
+`release.sh` renders Compose, pulls both matching MCloudLLC images, validates
+the Caddy configuration, starts without building, verifies the running image
+versions, checks app readiness and Caddy administration, and rejects a restart
+during those checks.
 
 ### Scoped upstream advisory
 
@@ -491,8 +447,8 @@ For rollback:
 bash scripts/rollback.sh /secure/backups/accepted-release.tar.age /srv/apex-rollback-new
 ```
 
-Review the archived configuration, ownership, image digests, signatures, and
-scan evidence. Stop current writers, explicitly select the accepted restored
+Review the archived configuration, ownership, release version, and scan
+evidence. Stop current writers, explicitly select the accepted restored
 data and configuration, then run `scripts/release.sh`. Rollback never
 automatically redeploys or deletes current durable data.
 
@@ -505,8 +461,8 @@ Before exposing an instance for general use, the operator should complete:
 - any required legal review of terms, acceptable use, privacy, retention, and
   the user notice/acceptance approach;
 - abuse, privacy, security, and operational contacts and response procedures;
-- an accepted, signed, digest-pinned, scanned two-image release, including
-  review of any unexpired scoped vulnerability exception;
+- a published, scanned two-image release, including review of any unexpired
+  scoped vulnerability exception;
 - successful encrypted restore rehearsal and rollback evidence; and
 - real public IPv4/IPv6 reachability, production issuance, and renewal evidence.
 

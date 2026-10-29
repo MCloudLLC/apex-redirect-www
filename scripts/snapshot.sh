@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # backup ARCHIVE: stop both writers, archive protected data, resume existing release.
 # restore ARCHIVE NEW_DIRECTORY: offline extraction only; never overwrite active data.
-# Rollback: stop both services, select the archived accepted APP_IMAGE/configuration,
+# Rollback: stop both services, select the archived release version/configuration,
 # restore only if needed into a NEW directory, then run release.sh explicitly.
 # Retain original directories and certificates; never compose down -v.
 set -euo pipefail

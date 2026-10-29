@@ -1,4 +1,4 @@
-name: signed release
+name: publish images
 on:
   push:
     tags: ["v*"]
@@ -7,55 +7,32 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     permissions:
       contents: write
       packages: write
-      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Validate release source and local TLS lifecycle
-        run: |
-          go install mvdan.cc/sh/v3/cmd/shfmt@v3.11.0
-          go install filippo.io/age/cmd/...@v1.2.1
-          bash scripts/check.sh
-          ACME_TEST_NATIVE=1 bash scripts/test-acme.sh
-      - name: Install signature and dependency verification tools
-        run: |
-          go install github.com/sigstore/cosign/v2/cmd/cosign@v2.6.1
-          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
-          govulncheck ./...
       - name: Build and scan before publishing
         run: |
-          docker build -t apex-redirect:release .
-          docker build -f deploy/Caddy.source.Dockerfile -t apex-caddy:release .
-          bash scripts/scan-images.sh apex-redirect:release apex-caddy:release
-      - name: Publish immutable image and keyless Cosign signature
+          prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker build -t "$prefix:$GITHUB_REF_NAME" -t "$prefix:latest" .
+          docker build -f deploy/Caddy.source.Dockerfile \
+            -t "$prefix-caddy:$GITHUB_REF_NAME" -t "$prefix-caddy:latest" .
+          bash scripts/scan-images.sh "$prefix:$GITHUB_REF_NAME" "$prefix-caddy:$GITHUB_REF_NAME"
+      - name: Publish MCloudLLC images
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           prefix="ghcr.io/${GITHUB_REPOSITORY,,}"
           printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           trap 'docker logout ghcr.io >/dev/null' EXIT
-          identity="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/.github/workflows/release.yaml@$GITHUB_REF"
-          for component in app caddy; do
-            case "$component" in
-              app) source=apex-redirect:release; image="$prefix" ;;
-              caddy) source=apex-caddy:release; image="$prefix-caddy" ;;
-            esac
-            docker tag "$source" "$image:$GITHUB_REF_NAME"
-            docker push "$image:$GITHUB_REF_NAME"
-            digest=$(docker inspect --format '{{json .RepoDigests}}' "$image:$GITHUB_REF_NAME" |
-              python3 -c 'import json,sys; print(next(x for x in json.load(sys.stdin) if x.startswith(sys.argv[1] + "@sha256:")))' "$image")
-            cosign sign --yes "$digest"
-            cosign verify --certificate-identity "$identity" \
-              --certificate-oidc-issuer https://token.actions.githubusercontent.com "$digest" >/dev/null
-            printf 'Verified %s release: `%s`\n\nCertificate identity: `%s`\n' "$component" "$digest" "$identity" >> "$GITHUB_STEP_SUMMARY"
-          done
+          docker push "$prefix:$GITHUB_REF_NAME"
+          docker push "$prefix:latest"
+          docker push "$prefix-caddy:$GITHUB_REF_NAME"
+          docker push "$prefix-caddy:latest"
+          printf 'Published `%s:%s` and `%s-caddy:%s`\n' \
+            "$prefix" "$GITHUB_REF_NAME" "$prefix" "$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,7 +7,6 @@
 **/*.key
 **/*.pem
 **/*.tar*
-deploy
 scripts
 tests
 data

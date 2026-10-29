@@ -7,17 +7,12 @@ import re
 import sys
 
 
-def validate_image(image, name="APP_IMAGE"):
-    match = re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._:/-]*@sha256:([a-f0-9]{64})", image)
-    if not match or match[1] == "0" * 64 or ":latest@" in image:
-        raise ValueError(f"{name} must be a complete, nonzero immutable digest reference")
-
-
 def check():
     if sys.platform != "linux":
         raise ValueError("host-network Compose requires Linux")
-    validate_image(os.environ.get("APP_IMAGE", ""))
-    validate_image(os.environ.get("CADDY_IMAGE", ""), "CADDY_IMAGE")
+    version = os.environ.get("RELEASE_VERSION", "latest")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", version):
+        raise ValueError("RELEASE_VERSION must be a valid container tag")
     for name in ("SERVICE_PUBLIC_IPS", "ACME_EMAIL", "APEX_DATA_DIR"):
         if not os.environ.get(name):
             raise ValueError(f"{name} is required")

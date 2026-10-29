@@ -1,7 +1,7 @@
 name: apex-redirect
 services:
   app:
-    image: ${APP_IMAGE:?Set APP_IMAGE to a complete immutable release reference}
+    image: ghcr.io/mcloudllc/apex-redirect-www:${RELEASE_VERSION:-latest}
     network_mode: host
     user: "10001:10001"
     read_only: true
@@ -39,7 +39,7 @@ services:
         bind:
           create_host_path: false
   caddy:
-    image: ${CADDY_IMAGE:?Set CADDY_IMAGE to an accepted signed immutable stock Caddy release}
+    image: ghcr.io/mcloudllc/apex-redirect-www-caddy:${RELEASE_VERSION:-latest}
     network_mode: host
     user: "10002:10002"
     read_only: true

@@ -19,20 +19,12 @@ spec.loader.exec_module(preflight)
 
 
 class ReleaseGate(unittest.TestCase):
-    def test_digest_references_fail_closed(self):
-        preflight.validate_image("ghcr.io/owner/apex@sha256:" + "1" * 64)
-        for value in ("", "apex", "apex:latest", "apex:v1", "apex@sha256:" + "0" * 64,
-                      "apex:latest@sha256:" + "1" * 64, "apex@sha256:123", "@sha256:" + "1" * 64):
-            with self.subTest(value=value), self.assertRaises(ValueError):
-                preflight.validate_image(value)
-
     def test_private_service_address_and_release_gates(self):
-        baseline = {"APP_IMAGE": "example.invalid/apex@sha256:" + "1" * 64,
-                    "CADDY_IMAGE": "example.invalid/caddy@sha256:" + "2" * 64,
-                    "SERVICE_PUBLIC_IPS": "93.184.216.34", "ACME_EMAIL": "ops@example.com",
+        baseline = {"RELEASE_VERSION": "v1.0.1", "SERVICE_PUBLIC_IPS": "93.184.216.34",
+                    "ACME_EMAIL": "ops@example.com",
                     "APEX_DATA_DIR": str(ROOT / "nonexistent-data")}
         for changes, message in (
-            ({"CADDY_IMAGE": "caddy:latest"}, "CADDY_IMAGE"),
+            ({"RELEASE_VERSION": "bad/tag"}, "RELEASE_VERSION"),
             ({"SERVICE_PUBLIC_IPS": "127.0.0.1"}, "real public"),
             ({}, "ALLOWED_DOMAINS"),
             ({"ALLOWED_DOMAINS": "example.com", "ADMISSION_ENABLED": "false"}, "ADMISSION_ENABLED"),
@@ -46,8 +38,7 @@ class ReleaseGate(unittest.TestCase):
 
     def test_public_mode_is_an_operator_choice(self):
         environment = {
-            "APP_IMAGE": "example.invalid/apex@sha256:" + "1" * 64,
-            "CADDY_IMAGE": "example.invalid/caddy@sha256:" + "2" * 64,
+            "RELEASE_VERSION": "v1.0.1",
             "SERVICE_PUBLIC_IPS": "93.184.216.34",
             "ACME_EMAIL": "ops@example.com",
             "APEX_DATA_DIR": str(ROOT / "nonexistent-data"),
@@ -127,15 +118,12 @@ class RuntimeScriptChecks(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.work)
         self.trace = self.work / "commands"
         self.env = dict(os.environ, PATH=str(self.work) + os.pathsep + os.environ["PATH"],
-                        APP_IMAGE="example.invalid/app@sha256:" + "1" * 64,
-                        CADDY_IMAGE="example.invalid/caddy@sha256:" + "2" * 64,
-                        RELEASE_CERTIFICATE_IDENTITY="https://example.invalid/release",
+                        RELEASE_VERSION="v1.0.1",
                         APEX_DATA_DIR=str(self.work / "data"), AGE_RECIPIENT="test-public-recipient",
                         MOCK_TRACE=str(self.trace))
         self.helper("python3", "#!/usr/bin/env bash\n"
                     'if test "$1" = scripts/preflight.py; then exit 0; fi\n'
                     f'exec {shlex.quote(sys.executable)} "$@"\n')
-        self.helper("cosign", "#!/usr/bin/env bash\nexit 0\n")
         self.helper("age", "#!/usr/bin/env bash\nexit 0\n")
         self.helper("curl", "#!/usr/bin/env bash\n"
                     'printf "curl %s\\n" "$*" >>"$MOCK_TRACE"\n'
@@ -158,7 +146,9 @@ elif args[0] == "inspect":
         count = int(counter.read_text()) + 1 if counter.exists() else 1
         counter.write_text(str(count))
         started = str(count)
-    print(json.dumps({"image": os.environ["APP_IMAGE" if service == "app" else "CADDY_IMAGE"],
+    image = ("ghcr.io/mcloudllc/apex-redirect-www-caddy:" if service == "caddy" else
+             "ghcr.io/mcloudllc/apex-redirect-www:") + os.environ["RELEASE_VERSION"]
+    print(json.dumps({"image": image,
                       "restarts": 0, "state": {"Running": mode != "exited",
                       "Restarting": mode == "restarting", "Status": mode,
                       "StartedAt": started}}))

@@ -38,13 +38,10 @@ directly to the customer's existing website host.
 
 [![Runtime architecture showing apex traffic through Caddy and the private Go policy service](docs/assets/runtime-architecture.svg)](docs/assets/runtime-architecture.svg)
 
-Releases are digest-pinned, signed, scanned, and validated before startup.
-Encrypted recovery and explicit rollback preserve durable state. The release
-build uses stock Caddy source with current dependency fixes in a scratch image.
-One upstream no-fix advisory is explicitly scoped, documented, and time-limited
-in `.trivyignore.yaml`; all other HIGH/CRITICAL findings remain release blockers.
-
-[![Release and operations flow showing tests, signed image gates, deployment, monitoring, and recovery](docs/assets/release-operations.svg)](docs/assets/release-operations.svg)
+MCloudLLC builds and scans both runtime images and publishes matching version
+tags to GHCR. Operators select one `RELEASE_VERSION`; Compose pulls and starts
+the matching app and Caddy images. Encrypted recovery and explicit rollback
+preserve durable state.
 
 ## Customer setup
 
@@ -142,7 +139,7 @@ stable public IPv4 address and the Compose deployment. The complete
 [step-by-step VM guide](docs/DEPLOYMENT.md#ubuntu-vm-quick-start) covers:
 
 1. VM sizing, firewall rules, and required DNS;
-2. Docker Engine, Compose, Cosign, Python, Git, curl, and age installation;
+2. Docker Engine, Compose, Python, Git, curl, and age installation;
 3. protected persistent storage and a reusable root-owned configuration file;
 4. staging deployment, health checks, logs, and end-to-end redirect testing;
 5. deliberate production ACME activation; and
@@ -157,7 +154,6 @@ cd /opt/apex-redirect-www
 set -a
 . /etc/apex-redirect/config.env
 set +a
-python3 scripts/preflight.py
 bash scripts/release.sh
 python3 scripts/verify-running.py
 curl --fail http://127.0.0.1:8081/readyz
@@ -168,16 +164,11 @@ Run deployment commands from a root login shell instead of adding an
 administrative user to the `docker` group; access to the Docker socket is
 effectively root access.
 
-Do not release images that fail the dependency or image scan gates. An upstream
-Caddy image is not automatically acceptable merely because its tag is current.
-Use approved immutable image digests, signature verification, and the reviewed
-TLS configuration; never bypass a failed scanner to complete a deployment.
-
-The release workflow builds both runtime images from reviewed source, scans
-them, publishes immutable GHCR references, signs both with keyless Cosign, and
-creates the matching GitHub release. The Caddy image is built from unmodified
-stock source in [deploy/Caddy.source.Dockerfile](deploy/Caddy.source.Dockerfile)
-to avoid stale base-image and toolchain findings.
+The release workflow builds and scans both images, publishes matching version
+tags under `ghcr.io/mcloudllc`, updates `latest`, and creates the GitHub release.
+The Caddy image is built from unmodified stock source in
+[deploy/Caddy.source.Dockerfile](deploy/Caddy.source.Dockerfile) to avoid stale
+base-image and toolchain findings.
 
 `CVE-2026-116587` has no published fix for the transitive go-jose/v3 module.
 The affected JWK parser is retained by Caddy's local-PKI dependency path, while
@@ -194,12 +185,10 @@ Both services rotate Docker JSON logs at 10 MB per file, keeping three files;
 this is a disk-space bound, not a complete time-based privacy retention policy.
 
 Provision protected persistent directories using the ownership shown in the
-configuration example. Export reviewed settings explicitly, including the
-accepted `APP_IMAGE` and `CADDY_IMAGE` digest references and exact approved
-release-signing identity, then:
+configuration example. Set `RELEASE_VERSION` to a published version and export
+the remaining settings, then:
 
 ```bash
-python3 scripts/preflight.py
 bash scripts/release.sh
 curl --fail http://127.0.0.1:8081/readyz
 ```
@@ -285,7 +274,7 @@ and rejects plaintext, links, special files, and overwriting an existing target.
 
 Restore into a new directory only. `scripts/rollback.sh` prepares an offline
 restore; it does not automatically redeploy or delete current data. Review
-archived manifests, image digests, signature evidence and ownership, stop
+archived manifests, release versions, scan evidence and ownership, stop
 writers, then explicitly select/start an accepted release. Never delete
 durable volumes or run `docker compose down -v`.
 

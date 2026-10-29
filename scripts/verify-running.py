@@ -11,7 +11,12 @@ FORMAT = '{"state":{{json .State}},"image":{{json .Config.Image}},"restarts":{{j
 
 def verify():
     fingerprint = {}
-    for service, variable in (("app", "APP_IMAGE"), ("caddy", "CADDY_IMAGE")):
+    version = os.environ.get("RELEASE_VERSION", "latest")
+    expected_images = {
+        "app": f"ghcr.io/mcloudllc/apex-redirect-www:{version}",
+        "caddy": f"ghcr.io/mcloudllc/apex-redirect-www-caddy:{version}",
+    }
+    for service in ("app", "caddy"):
         ids = subprocess.check_output(COMPOSE + ["ps", "--all", "--quiet", service],
                                       text=True).split()
         if len(ids) != 1:
@@ -21,8 +26,8 @@ def verify():
         state = info["state"]
         if not state["Running"] or state["Restarting"] or state["Status"] != "running":
             raise ValueError(f"{service}: container is not running normally")
-        if info["image"] != os.environ[variable]:
-            raise ValueError(f"{service}: running image does not match the accepted release")
+        if info["image"] != expected_images[service]:
+            raise ValueError(f"{service}: running image does not match RELEASE_VERSION")
         fingerprint[service] = [ids[0], state["StartedAt"], info["restarts"]]
     return fingerprint
 

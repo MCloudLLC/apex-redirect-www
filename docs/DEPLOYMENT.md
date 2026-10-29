@@ -108,9 +108,9 @@ case "$(dpkg --print-architecture)" in
 esac
 
 curl -fL -o /tmp/cosign.deb \
-  "https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign_2.6.1_$(dpkg --print-architecture).deb"
-printf '%s  %s\n' "$COSIGN_SHA256" /tmp/cosign.deb | sha256sum --check -
-sudo apt install -y /tmp/cosign.deb
+  "https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign_2.6.1_$(dpkg --print-architecture).deb" &&
+  printf '%s  %s\n' "$COSIGN_SHA256" /tmp/cosign.deb | sha256sum --check - &&
+  sudo apt install -y /tmp/cosign.deb
 rm /tmp/cosign.deb
 cosign version
 age --version

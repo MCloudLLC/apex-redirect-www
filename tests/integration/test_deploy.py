@@ -184,3 +184,42 @@ elif args[0] == "inspect":
         self.assertNotIn(" stop ", commands)
         self.assertNotIn(" start ", commands)
         self.assertFalse((self.work / "backup.age").exists())
+
+    def test_backup_rejects_existing_archive_or_checksum(self):
+        archive = self.work / "backup.age"
+        for path in (archive, Path(str(archive) + ".sha256")):
+            for kind in ("file", "directory", "symlink"):
+                with self.subTest(path=path, kind=kind):
+                    if kind == "file":
+                        path.write_text("existing")
+                    elif kind == "directory":
+                        path.mkdir()
+                    else:
+                        path.symlink_to(self.work / "missing")
+                    result = self.invoke("snapshot.sh", "backup", archive)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("archive already exists", result.stderr)
+                    self.assertFalse(self.trace.exists())
+                    if kind == "directory":
+                        path.rmdir()
+                    else:
+                        path.unlink()
+
+    def test_restore_rejects_existing_target(self):
+        target = self.work / "restored"
+        for kind in ("file", "directory", "symlink"):
+            with self.subTest(kind=kind):
+                if kind == "file":
+                    target.write_text("existing")
+                elif kind == "directory":
+                    target.mkdir()
+                else:
+                    target.symlink_to(self.work / "missing")
+                result = self.invoke("snapshot.sh", "restore", self.work / "backup.age", target,
+                                     AGE_IDENTITY_FILE=str(self.work / "identity"))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("restore target must not exist", result.stderr)
+                if kind == "directory":
+                    target.rmdir()
+                else:
+                    target.unlink()

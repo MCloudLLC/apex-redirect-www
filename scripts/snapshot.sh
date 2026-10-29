@@ -20,10 +20,10 @@ backup)
   test "$#" -eq 2
   : "${AGE_RECIPIENT:?Set the offline backup public age recipient}"
   python3 scripts/preflight.py
-  test ! -e "$2" && test ! -L "$2" && test ! -e "$2.sha256" && test ! -L "$2.sha256" || {
+  if test -e "$2" || test -L "$2" || test -e "$2.sha256" || test -L "$2.sha256"; then
     echo "archive already exists" >&2
     exit 1
-  }
+  fi
   archive=$(realpath -m "$2")
   case "$archive" in "$APEX_DATA_DIR"/*)
     echo "archive must be outside data directory" >&2
@@ -49,10 +49,10 @@ backup)
 restore)
   test "$#" -eq 3
   : "${AGE_IDENTITY_FILE:?Set the protected age identity FILE path, never a secret value}"
-  test ! -e "$3" && test ! -L "$3" || {
+  if test -e "$3" || test -L "$3"; then
     echo "restore target must not exist" >&2
     exit 1
-  }
+  fi
   read -r expected <"$2.sha256"
   checksum=$(sha256sum "$2")
   test "${checksum%% *}" = "$expected" || {

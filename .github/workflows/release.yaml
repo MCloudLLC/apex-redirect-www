@@ -23,7 +23,7 @@ jobs:
           go install mvdan.cc/sh/v3/cmd/shfmt@v3.11.0
           go install filippo.io/age/cmd/...@v1.2.1
           bash scripts/check.sh
-          bash scripts/test-acme.sh
+          ACME_TEST_NATIVE=1 bash scripts/test-acme.sh
       - name: Install signature and dependency verification tools
         run: |
           go install github.com/sigstore/cosign/v2/cmd/cosign@v2.6.1

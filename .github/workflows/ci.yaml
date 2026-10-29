@@ -20,7 +20,7 @@ jobs:
           go install filippo.io/age/cmd/...@v1.2.1
           bash scripts/check.sh
       - name: Local ACME lifecycle (no public DNS or public CA)
-        run: bash scripts/test-acme.sh
+        run: ACME_TEST_NATIVE=1 bash scripts/test-acme.sh
       - name: Dependency audit
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@v1.9.0

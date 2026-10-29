@@ -136,6 +136,37 @@ overwrite `X-Apex-Client-IP` using the actual visitor address.
 
 ## Deployment
 
+For the easiest supported VM setup, use a fresh Ubuntu 24.04 LTS host with a
+stable public IPv4 address and the Compose deployment. The complete
+[step-by-step VM guide](docs/DEPLOYMENT.md#ubuntu-vm-quick-start) covers:
+
+1. VM sizing, firewall rules, and required DNS;
+2. Docker Engine, Compose, Cosign, Python, Git, curl, and age installation;
+3. protected persistent storage and a reusable root-owned configuration file;
+4. staging deployment, health checks, logs, and end-to-end redirect testing;
+5. deliberate production ACME activation; and
+6. backup, upgrade, rollback, and routine operations.
+
+The short operator flow, after installing requirements and editing
+`/etc/apex-redirect/config.env`, is:
+
+```bash
+sudo -i
+cd /opt/apex-redirect-www
+set -a
+. /etc/apex-redirect/config.env
+set +a
+python3 scripts/preflight.py
+bash scripts/release.sh
+python3 scripts/verify-running.py
+curl --fail http://127.0.0.1:8081/readyz
+exit
+```
+
+Run deployment commands from a root login shell instead of adding an
+administrative user to the `docker` group; access to the Docker socket is
+effectively root access.
+
 Do not release images that fail the dependency or image scan gates. An upstream
 Caddy image is not automatically acceptable merely because its tag is current.
 Use approved immutable image digests, signature verification, and the reviewed

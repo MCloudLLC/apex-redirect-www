@@ -1,6 +1,8 @@
-# Hosted Redirect Service Terms and Acceptable Use
+# Operator Terms and Acceptable Use Template
 
-Draft for legal review. Not approved for public launch.
+Optional starting template for self-hosted operators. It is not legal advice,
+is not part of the Apache-2.0 software license, and has no effect until an
+operator adapts and publishes it for their own service.
 
 Before publication, the operator must identify its legal entity, service domain,
 effective date, abuse and privacy contacts, applicable jurisdiction, and the
@@ -81,7 +83,6 @@ Transparency logs maintained outside our control.
 
 ## Separate open-source rights
 
-The source code is licensed under [Apache-2.0](LICENSE). These hosted-service
-terms do not restrict rights granted by that license or require independent
-self-hosters to use our hosted service or blocklist. Self-hosters operate their
-own service and are responsible for its policies, legal notices, and users.
+The source code is licensed under [Apache-2.0](LICENSE). Service terms do not
+restrict rights granted by that license. Every self-hosted operator is
+responsible for its own policies, legal notices, blocklist, and users.

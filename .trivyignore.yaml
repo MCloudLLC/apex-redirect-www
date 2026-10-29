@@ -1,0 +1,6 @@
+vulnerabilities:
+  - id: CVE-2026-116587
+    purls:
+      - "pkg:golang/github.com/go-jose/go-jose/v3@v3.0.5"
+    expired_at: 2026-11-29
+    statement: The dependency is retained by Caddy's unused local-PKI modules; this service accepts only operator-controlled configuration and uses the external ACME issuer.

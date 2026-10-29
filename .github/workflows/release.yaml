@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
-      contents: read
+      contents: write
       packages: write
       id-token: write
     steps:
@@ -32,9 +32,7 @@ jobs:
       - name: Build and scan before publishing
         run: |
           docker build -t apex-redirect:release .
-          caddy=caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f
-          docker pull "$caddy"
-          docker tag "$caddy" apex-caddy:release
+          docker build -f deploy/Caddy.source.Dockerfile -t apex-caddy:release .
           bash scripts/scan-images.sh apex-redirect:release apex-caddy:release
       - name: Publish immutable image and keyless Cosign signature
         env:
@@ -58,3 +56,9 @@ jobs:
               --certificate-oidc-issuer https://token.actions.githubusercontent.com "$digest" >/dev/null
             printf 'Verified %s release: `%s`\n\nCertificate identity: `%s`\n' "$component" "$digest" "$identity" >> "$GITHUB_STEP_SUMMARY"
           done
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes --title "$GITHUB_REF_NAME"

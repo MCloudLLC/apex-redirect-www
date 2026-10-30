@@ -246,7 +246,7 @@ func (p *Policy) lookup(ctx context.Context, resolver, host string, family uint1
 		aliases := make(map[string]*dns.CNAME)
 		addresses := make(map[string][]dns.RR)
 		for _, record := range response.Answer {
-			owner, err := domain.Normalize(record.Header().Name)
+			owner, err := normalizeDNSName(record.Header().Name)
 			if err != nil || record.Header().Class != dns.ClassINET {
 				return result, fmt.Errorf("%w: malformed DNS answer", ErrIneligible)
 			}
@@ -288,7 +288,7 @@ func (p *Policy) lookup(ctx context.Context, resolver, host string, family uint1
 				delete(addresses, host)
 				break
 			}
-			next, err := domain.Normalize(alias.Target)
+			next, err := normalizeDNSName(alias.Target)
 			if err != nil || seen[next] || len(result.chain) > maxCNAMEHops {
 				return result, fmt.Errorf("%w: invalid or excessive DNS alias chain", ErrIneligible)
 			}
@@ -328,6 +328,29 @@ func (p *Policy) lookup(ctx context.Context, resolver, host string, family uint1
 		result.ttl = min(result.ttl, negativeTTL)
 		return result, nil
 	}
+}
+
+func normalizeDNSName(name string) (string, error) {
+	name = strings.ToLower(strings.TrimSuffix(name, "."))
+	if len(name) == 0 || len(name) > 253 {
+		return "", errors.New("invalid DNS name length")
+	}
+	labels := strings.Split(name, ".")
+	if len(labels) < 2 {
+		return "", errors.New("DNS name requires a suffix")
+	}
+	for _, label := range labels {
+		if len(label) == 0 || len(label) > 63 || label[0] == '-' || label[len(label)-1] == '-' {
+			return "", errors.New("invalid DNS label")
+		}
+		for _, char := range label {
+			if !(char >= 'a' && char <= 'z' || char >= '0' && char <= '9' ||
+				char == '-' || char == '_') {
+				return "", errors.New("invalid DNS label character")
+			}
+		}
+	}
+	return name, nil
 }
 
 func (p *Policy) exchange(ctx context.Context, resolver, host string, family uint16) (*dns.Msg, error) {

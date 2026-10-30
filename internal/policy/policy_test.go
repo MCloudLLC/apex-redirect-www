@@ -226,11 +226,21 @@ func TestAddressEligibilityAndFamilyErrors(t *testing.T) {
 }
 
 func TestCNAMERouting(t *testing.T) {
-	for _, mode := range []string{"valid inline", "valid separate", "loop", "cross-response loop", "too deep", "family mismatch", "coexist", "www loop"} {
+	for _, mode := range []string{"valid inline", "valid separate", "valid underscored www", "loop", "cross-response loop", "too deep", "family mismatch", "coexist", "www loop"} {
 		t.Run(mode, func(t *testing.T) {
 			p := newPolicy(t, func(q *dns.Msg) *dns.Msg {
 				r := reply(q)
 				name, family := q.Question[0].Name, q.Question[0].Qtype
+				if mode == "valid underscored www" && name == "www.example.com." {
+					target := "_aiw_svc.example.net."
+					r.Answer = []dns.RR{record(name + " 60 IN CNAME " + target)}
+					if family == dns.TypeA {
+						r.Answer = append(r.Answer, record(target+" 60 IN A 8.8.8.8"))
+					} else {
+						r.Answer = append(r.Answer, record(target+" 60 IN AAAA 2001:4860:4860::8888"))
+					}
+					return r
+				}
 				if mode == "www loop" {
 					if name == "www.example.com." {
 						r.Answer = []dns.RR{record(name + " 60 IN CNAME example.com.")}

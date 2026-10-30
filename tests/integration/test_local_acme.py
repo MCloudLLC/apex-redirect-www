@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real stock Caddy + Pebble + Go, local DNS only; never contacts a public CA.
+"""Real Caddy + Pebble + Go, local DNS only; never contacts a public CA.
 
 Run: python3 -m unittest discover -s tests/integration -p 'test_local_acme.py' -v
 Requires Linux, Docker, Python 3 and Go. Scratch artifacts stay under this repo.
@@ -22,7 +22,10 @@ import unittest
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
-CADDY = "caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f"
+CADDY = os.environ.get(
+    "ACME_CADDY_IMAGE",
+    "caddy:2.11.7-alpine@sha256:eb4d35b7452d1ab6171fbdbe8d9275b2301dad6dad92115d91e19fb9b24d510f",
+)
 PEBBLE = "ghcr.io/letsencrypt/pebble:2.8.0@sha256:d9080f68f6cb6af8d82134ab26de0aaaf312ac9cba42aecc6d3aede6cb63007b"
 
 
@@ -127,8 +130,9 @@ class LocalACME(unittest.TestCase):
                                    "CADDY_STORAGE", "ACME_EMAIL", "ACME_CA")
                     for arg in ("-e", key + "=" + adapt_env[key])]
         adapted = json.loads(run("docker", "run", "--rm", *env_args,
+                                 "--entrypoint", "/usr/bin/caddy",
                                  "-v", f"{ROOT / 'deploy/Caddyfile'}:/Caddyfile:ro",
-                                 CADDY, "caddy", "adapt", "--config", "/Caddyfile"))
+                                 CADDY, "adapt", "--config", "/Caddyfile"))
         adapted["admin"]["listen"] = f"127.0.0.1:{cls.admin}"
         policy = adapted["apps"]["tls"]["automation"]["policies"][0]
         issuer = policy["issuers"][0]
@@ -146,7 +150,8 @@ class LocalACME(unittest.TestCase):
             "--read-only", "--memory", "512m", "--pids-limit", "256",
             "-e", "XDG_DATA_HOME=/fixture/caddy", "-e", "XDG_CONFIG_HOME=/fixture/caddy/config",
             "--security-opt", "no-new-privileges:true",
-            "-v", f"{cls.work}:/fixture", CADDY, "caddy", "run", "--config", "/fixture/caddy.json")
+            "--entrypoint", "/usr/bin/caddy",
+            "-v", f"{cls.work}:/fixture", CADDY, "run", "--config", "/fixture/caddy.json")
         cls.wait_url(cls.admin, "/config/")
 
     @classmethod

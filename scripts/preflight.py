@@ -41,7 +41,7 @@ def check():
         raise ValueError("APEX_DATA_DIR must be an existing absolute non-symlink directory")
     if root.stat().st_mode & 0o077:
         raise ValueError("APEX_DATA_DIR must have private mode 0700")
-    for name, uid in (("app", 10001), ("caddy", 10002)):
+    for name, uid in (("app", 10001), ("caddy", 0)):
         path = root / name
         if path.is_symlink() or not path.is_dir():
             raise ValueError(f"provision {path} without symlinks before startup")

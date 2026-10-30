@@ -108,7 +108,7 @@ Create the protected state directories required by the container users:
 ```bash
 sudo install -d -m 0700 /srv/apex-redirect
 sudo install -d -m 0700 -o 10001 -g 10001 /srv/apex-redirect/app
-sudo install -d -m 0700 -o 10002 -g 10002 /srv/apex-redirect/caddy
+sudo install -d -m 0700 -o 0 -g 0 /srv/apex-redirect/caddy
 ```
 
 These directories contain the SQLite policy database, ACME account, private
@@ -303,7 +303,7 @@ Provision persistent storage before release:
 ```bash
 install -d -m 0700 /srv/apex-redirect
 install -d -m 0700 -o 10001 -g 10001 /srv/apex-redirect/app
-install -d -m 0700 -o 10002 -g 10002 /srv/apex-redirect/caddy
+install -d -m 0700 -o 0 -g 0 /srv/apex-redirect/caddy
 ```
 
 `app` contains SQLite policy/admission state; `caddy` contains ACME account,

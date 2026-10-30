@@ -12,5 +12,5 @@ RUN go mod init stock-caddy-check \
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /caddy /usr/bin/caddy
-USER 10002:10002
+USER 0:0
 ENTRYPOINT ["/usr/bin/caddy"]

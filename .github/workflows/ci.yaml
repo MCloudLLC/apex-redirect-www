@@ -29,5 +29,25 @@ jobs:
         run: |
           docker build -t apex-redirect:ci .
           docker build -f deploy/Caddy.source.Dockerfile -t apex-caddy:ci .
+      - name: Smoke test hardened Caddy runtime
+        run: |
+          install -d -m 0700 "$RUNNER_TEMP/caddy"
+          container=$(
+            docker run -d --network host --read-only --user 0:0 \
+              --cap-drop ALL --cap-add NET_BIND_SERVICE \
+              --security-opt no-new-privileges:true \
+              --memory 512m --pids-limit 256 \
+              -e ACME_EMAIL=ci@example.invalid \
+              -e CADDY_STORAGE=/var/lib/caddy \
+              -e XDG_DATA_HOME=/var/lib/caddy \
+              -e XDG_CONFIG_HOME=/var/lib/caddy/config \
+              -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+              -v "$RUNNER_TEMP/caddy:/var/lib/caddy" \
+              apex-caddy:ci run --config /etc/caddy/Caddyfile --adapter caddyfile
+          )
+          trap 'docker logs "$container"; docker rm -f "$container"' EXIT
+          curl --fail --silent --show-error --retry 20 --retry-delay 1 \
+            --retry-connrefused http://127.0.0.1:2019/config/ >/dev/null
+          test "$(docker inspect --format '{{.State.Status}}' "$container")" = running
       - name: Scan release images
         run: bash scripts/scan-images.sh apex-redirect:ci apex-caddy:ci

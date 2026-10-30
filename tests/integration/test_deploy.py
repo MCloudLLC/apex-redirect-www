@@ -192,6 +192,13 @@ elif args[0] == "inspect":
         )
         self.assertNotIn("command: [caddy, run", compose)
 
+    def test_caddy_runtime_can_bind_privileged_ports(self):
+        compose = (ROOT / "deploy/compose.yaml").read_text()
+        self.assertIn('user: "0:0"', compose)
+        self.assertIn("cap_drop: [ALL]", compose)
+        self.assertIn("cap_add: [NET_BIND_SERVICE]", compose)
+        self.assertIn("security_opt: [no-new-privileges:true]", compose)
+
     def test_backup_of_stopped_release_neither_quiesces_nor_starts_services(self):
         result = self.invoke("snapshot.sh", "backup", self.work / "backup.age",
                              MOCK_CADDY="exited")

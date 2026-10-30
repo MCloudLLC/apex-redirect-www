@@ -170,6 +170,8 @@ The Caddy image is built from unmodified stock source in
 [deploy/Caddy.source.Dockerfile](deploy/Caddy.source.Dockerfile) to avoid stale
 base-image and toolchain findings.
 
+[![Release and operations flow from source validation through image scanning, deployment, monitoring, and recovery](docs/assets/release-operations.svg)](docs/assets/release-operations.svg)
+
 `CVE-2026-116587` has no published fix for the transitive go-jose/v3 module.
 The affected JWK parser is retained by Caddy's local-PKI dependency path, while
 this deployment accepts only operator-controlled configuration and uses the

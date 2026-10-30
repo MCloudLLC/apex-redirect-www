@@ -341,6 +341,8 @@ path because the release and recovery automation targets it.
 
 Run from the repository root with the reviewed environment exported:
 
+[![Release and operations flow from source validation through image scanning, deployment, monitoring, and recovery](assets/release-operations.svg)](assets/release-operations.svg)
+
 ```bash
 bash scripts/release.sh
 ```

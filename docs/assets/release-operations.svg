@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1400" height="980" viewBox="0 0 1400 980" role="img" aria-labelledby="release-title release-desc">
   <title id="release-title">Release and operations lifecycle</title>
-  <desc id="release-desc">A gated release flow from source and continuous integration through tests, local ACME, application and audited stock-source Caddy builds, digest signing and scanning, a fail-closed CVE blocker, Linux Compose and systemd deployment, readiness monitoring, encrypted age backups, new-directory restore, explicit rollback, and external production launch gates.</desc>
+  <desc id="release-desc">A gated release flow from source and continuous integration through tests, local ACME, application and stock-source Caddy builds, vulnerability scanning, versioned image publication, a fail-closed CVE blocker, Linux Compose and systemd deployment, readiness monitoring, encrypted age backups, new-directory restore, explicit rollback, and external production launch gates.</desc>
   <defs>
     <linearGradient id="release-bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#071426"/>
@@ -42,7 +42,7 @@
   <g transform="translate(1080 52)">
     <rect width="250" height="48" rx="24" fill="#123325" stroke="#4ade80" stroke-opacity="0.65"/>
     <path d="M22 25l8 8 15-18" fill="none" stroke="#86efac" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="57" y="31" fill="#bbf7d0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700">Promote only verified digests</text>
+    <text x="57" y="31" fill="#bbf7d0" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15" font-weight="700">Publish only scanned images</text>
   </g>
 
   <!-- Stage labels -->
@@ -94,12 +94,12 @@
     <rect x="1035" y="205" width="310" height="205" rx="22" fill="url(#release-card)" stroke="#35624f"/>
     <path d="M1062 236h36l9 9v35h-45zM1098 236v10h9" fill="none" stroke="#4ade80" stroke-width="2.2"/>
     <path d="M1071 258l7 7 15-16" fill="none" stroke="#86efac" stroke-width="2.7" stroke-linecap="round"/>
-    <text x="1124" y="247" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Artifact gates</text>
-    <text x="1124" y="273" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">identity + integrity</text>
+    <text x="1124" y="247" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Publish gates</text>
+    <text x="1124" y="273" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">scan before registry push</text>
     <rect x="1059" y="303" width="262" height="78" rx="12" fill="#0a2a2b"/>
-    <text x="1080" y="328" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">01 · record immutable digest</text>
-    <text x="1080" y="351" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">02 · sign provenance</text>
-    <text x="1080" y="374" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">03 · vulnerability scan</text>
+    <text x="1080" y="328" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">01 · build matching version tags</text>
+    <text x="1080" y="351" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">02 · vulnerability scan</text>
+    <text x="1080" y="374" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">03 · publish images + release</text>
   </g>
 
   <path d="M305 307H354" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
@@ -134,7 +134,7 @@
     <text x="155" y="751" fill="#f8fafc" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="20" font-weight="700">Linux deployment</text>
     <text x="155" y="777" fill="#b4c8d6" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="15">Compose workload · systemd lifecycle</text>
     <rect x="78" y="810" width="418" height="58" rx="12" fill="#0a2a2b"/>
-    <text x="96" y="834" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Deploy exact signed digests</text>
+    <text x="96" y="834" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Deploy one reviewed release version</text>
     <text x="96" y="856" fill="#d1fae5" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">Protected state · restart policy · least privilege</text>
   </g>
 
@@ -163,7 +163,7 @@
   <path d="M520 800H549" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
   <path d="M925 800H954" fill="none" stroke="#22d3ee" stroke-width="3" marker-end="url(#rel-arrow-cyan)"/>
   <path d="M1155 894v35H288v-24" fill="none" stroke="#fb923c" stroke-width="2.5" stroke-dasharray="8 7" marker-end="url(#rel-arrow-orange)"/>
-  <text x="720" y="950" text-anchor="middle" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">rollback selects an explicit known-good release; never mutates the backup in place</text>
+  <text x="720" y="950" text-anchor="middle" fill="#fdba74" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="14">rollback selects an explicit known-good version; never mutates the backup in place</text>
 
   <!-- External gates -->
   <g transform="translate(55 455)" filter="url(#release-shadow)">

@@ -8,5 +8,5 @@ test "$#" -eq 2 || {
 }
 bash scripts/snapshot.sh restore "$1" "$2"
 echo "Review archived deploy/ and compose.rendered.json against accepted release evidence."
-echo "Stop current services before selecting restored data. Verify the archived digest"
-echo "signature, then explicitly run release.sh with reviewed archived configuration."
+echo "Stop current services before selecting restored data. Verify the accepted release"
+echo "version and scan evidence, then run release.sh with reviewed archived configuration."
